@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 
 type DetailId = 'prize' | 'schedule' | 'recording';
-const questionnaireUrl = import.meta.env.VITE_QUESTIONNAIRE_URL?.trim();
 
 const details: { id: DetailId; number: string; title: string; summary: string; body: string }[] = [
   {
