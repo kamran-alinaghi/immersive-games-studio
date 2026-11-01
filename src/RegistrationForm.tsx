@@ -19,6 +19,7 @@ type RegistrationData = {
 };
 
 const apiUrl = import.meta.env.VITE_REGISTRATION_API_URL?.trim();
+const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;
 
 const areas = [
   'Anmore', 'Belcarra', 'Bowen Island', 'Burnaby', 'Coquitlam', 'Delta',
@@ -78,6 +79,7 @@ function RegistrationForm() {
   const [data, setData] = useState<RegistrationData>(initialData);
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error' | 'unconfigured'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const emailHasFormatError = data.email.length > 0 && !emailPattern.test(data.email.trim());
 
   const update = <K extends keyof RegistrationData>(key: K, value: RegistrationData[K]) => {
     setData(current => ({ ...current, [key]: value }));
@@ -185,8 +187,8 @@ function RegistrationForm() {
 
           <div className="registration-field">
             <label htmlFor="email">Email <span className="required-mark">*</span></label>
-            <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Enter an email address in the format name@example.com." value={data.email} onChange={event => update('email', event.target.value)} />
-            <small>Enter an address in the format name@example.com.</small>
+            <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}" title="Enter an email address in the format name@example.com." aria-invalid={emailHasFormatError} className={emailHasFormatError ? 'registration-email-invalid' : undefined} value={data.email} onChange={event => update('email', event.target.value)} />
+            <small className={emailHasFormatError ? 'registration-email-hint-invalid' : undefined}>{emailHasFormatError ? 'Please enter a valid email address, such as name@example.com.' : 'Enter an address in the format name@example.com.'}</small>
           </div>
 
           <ChoiceGroup label="Able to attend games and travel within Metro Vancouver when required?" name="travelMetroVancouver" value={data.travelMetroVancouver} options={['Yes', 'No']} onChange={value => update('travelMetroVancouver', value)} />
