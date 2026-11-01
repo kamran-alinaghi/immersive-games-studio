@@ -98,6 +98,15 @@ function RegistrationForm() {
     event.preventDefault();
     setErrorMessage('');
 
+    const normalizedEmail = data.email.trim();
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailPattern.test(normalizedEmail)) {
+      setStatus('error');
+      setErrorMessage('Please enter a valid email address, such as name@example.com.');
+      document.getElementById('email')?.focus();
+      return;
+    }
+
     if (!apiUrl) {
       setStatus('unconfigured');
       return;
@@ -176,7 +185,8 @@ function RegistrationForm() {
 
           <div className="registration-field">
             <label htmlFor="email">Email <span className="required-mark">*</span></label>
-            <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={data.email} onChange={event => update('email', event.target.value)} />
+            <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Enter an email address in the format name@example.com." value={data.email} onChange={event => update('email', event.target.value)} />
+            <small>Enter an address in the format name@example.com.</small>
           </div>
 
           <ChoiceGroup label="Able to attend games and travel within Metro Vancouver when required?" name="travelMetroVancouver" value={data.travelMetroVancouver} options={['Yes', 'No']} onChange={value => update('travelMetroVancouver', value)} />
