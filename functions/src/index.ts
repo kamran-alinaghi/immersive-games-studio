@@ -201,19 +201,32 @@ async function isRateLimited(ip: string): Promise<boolean> {
 
 export const submitRegistration = onRequest(
   {
-    cors: allowedOrigins,
     maxInstances: 3,
   },
   async (request, response) => {
-    if (request.method !== "POST") {
-      response.set("Allow", "POST");
-      response.status(405).json({error: "Method not allowed."});
+    const origin = request.get("origin");
+
+    // Enforce the origin allowlist before handling browser preflight requests.
+    if (origin && !allowedOrigins.includes(origin)) {
+      response.status(403).json({error: "Origin not allowed."});
       return;
     }
 
-    const origin = request.get("origin");
-    if (origin && !allowedOrigins.includes(origin)) {
-      response.status(403).json({error: "Origin not allowed."});
+    if (origin) {
+      response.set("Access-Control-Allow-Origin", origin);
+      response.set("Vary", "Origin");
+    }
+
+    if (request.method === "OPTIONS") {
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.status(204).send();
+      return;
+    }
+
+    if (request.method !== "POST") {
+      response.set("Allow", "POST, OPTIONS");
+      response.status(405).json({error: "Method not allowed."});
       return;
     }
 
