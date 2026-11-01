@@ -113,3 +113,44 @@ button{font:inherit}
 @media(max-width:850px){.site-header{padding:0 23px}.nav{gap:17px}.nav>a{font-size:10px}.hero{padding-left:7vw;padding-right:7vw;grid-template-columns:1fr .9fr;min-height:600px}.hero h1{font-size:clamp(52px,7vw,72px)}.hero-art{min-height:360px}.map-card{width:100%}.art-orbit{width:320px;height:320px}.orbit-two{width:380px;height:380px}.section-wrap{padding-left:8vw;padding-right:8vw}.prize-section{padding-left:8vw;padding-right:8vw}.prize-grid{gap:7%}.prize-grid h2{font-size:75px}.site-footer{grid-template-columns:1fr 1fr}.site-footer>p{display:none}.footer-links{grid-column:2}}
 @media(max-width:640px){.site-header{height:69px}.brand-name{font-size:10px}.menu-toggle{display:block;cursor:pointer}.nav{display:none;position:absolute;top:68px;left:0;right:0;padding:18px 23px 24px;background:var(--paper);border-bottom:1px solid var(--line);flex-direction:column;align-items:stretch;gap:0}.nav-open{display:flex}.nav>a:not(.nav-cta){padding:13px 0;border-bottom:1px solid var(--line);font-size:12px}.nav-cta{justify-content:center;margin-top:15px}.hero{display:flex;flex-direction:column;align-items:stretch;padding:62px 25px 77px;min-height:auto}.hero h1{font-size:clamp(59px,16vw,82px);margin-top:24px}.hero-copy{font-size:18px}.hero-note{margin-top:28px;font-size:9px}.hero-art{min-height:370px;margin-top:25px}.map-card{width:min(78%,310px);aspect-ratio:.83}.floating-seal{left:3%;bottom:18px;width:87px;height:87px}.art-orbit{width:310px;height:310px}.orbit-two{width:360px;height:360px}.hero-bottom{left:25px;right:25px;bottom:20px;font-size:7px}.section-wrap{padding:76px 25px}.intro-grid{grid-template-columns:1fr;gap:25px;margin-top:27px}.intro h2{font-size:55px}.intro-text{max-width:none}.lead{font-size:21px}.feature-grid{grid-template-columns:1fr;gap:24px;margin-top:48px}.feature-card{display:grid;grid-template-columns:36px 1fr;column-gap:12px;padding-top:19px}.feature-icon{grid-row:1/3}.feature-card h3{margin:0 0 5px}.feature-card p{max-width:none}.prize-section{padding:65px 25px 28px}.prize-grid{grid-template-columns:1fr;gap:34px;padding:38px 0 43px}.prize-grid h2{font-size:clamp(65px,17vw,90px)}.prize-description h3{font-size:25px}.prize-foot{flex-direction:column;gap:9px;line-height:1.6}.details-section{padding-top:75px;padding-bottom:80px}.details-heading{display:block;margin:25px 0 32px}.details-heading h2{font-size:46px}.details-heading p{margin-top:18px}.detail-trigger{grid-template-columns:30px 1fr 23px;gap:11px;padding:20px 0}.detail-copy strong{font-size:19px}.detail-copy>span{font-size:11px}.detail-expanded{padding:0 25px 22px 41px}.final-cta{padding:67px 25px 55px}.site-footer{padding:30px 25px;grid-template-columns:1fr;gap:22px}.footer-links{grid-column:1;justify-content:flex-start}.site-footer small{grid-column:1;line-height:1.7}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important}}
+
+/* Custom registration form */
+.registration-page{min-height:100vh;background:var(--paper);color:var(--ink)}
+.registration-header{height:82px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 clamp(25px,6vw,90px);border-bottom:1px solid var(--line)}
+.registration-back{display:inline-flex;align-items:center;gap:9px;font-size:11px;color:#635d4f}
+.registration-back:hover{color:#9a7640}
+.registration-intro{max-width:760px;margin:0 auto;padding:70px 25px 35px}
+.registration-intro h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-size:clamp(48px,7vw,76px);letter-spacing:-.045em;line-height:1.05;margin:22px 0}
+.registration-intro h1 i{color:#987648;font-weight:400}
+.registration-intro>p:not(.eyebrow){font-size:13px;line-height:1.9;color:#777061;max-width:600px}
+.registration-required-note{margin-top:24px}
+.required-mark{color:#9c4935;font-weight:700}
+.registration-form{max-width:760px;margin:0 auto;padding:0 25px 70px}
+.registration-section{padding:28px 0 34px;border-top:1px solid var(--line)}
+.registration-section-number{font-size:9px;letter-spacing:.17em;font-weight:700;color:#8e7956;margin:0 0 28px}
+.registration-field,.registration-fieldset{margin:0 0 29px}
+.registration-field>label,.registration-fieldset legend{display:block;font-size:13px;line-height:1.7;font-weight:600;color:#3c382d;margin-bottom:12px}
+.registration-fieldset{padding:0;border:0;min-width:0}
+.registration-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.registration-option{display:flex;align-items:center;gap:11px;min-height:47px;padding:12px 14px;border:1px solid #d0c3a8;background:#f3eee3;color:#5d574a;font-size:12px;line-height:1.55;cursor:pointer;transition:border-color .15s,background .15s}
+.registration-option:hover{border-color:#a48756}
+.registration-option.selected{border-color:#a48756;background:#e6dcc8;color:#312b20}
+.registration-option input{width:15px;height:15px;flex:0 0 auto;margin:0;accent-color:#8f7042}
+.registration-field input:not([type=checkbox]):not([type=radio]),.registration-field textarea,.registration-field select{display:block;width:100%;border:1px solid #cfc2a8;background:#f7f3ea;color:var(--ink);border-radius:0;padding:13px 14px;font:inherit;font-size:13px;outline:none}
+.registration-field textarea{resize:vertical;min-height:125px;line-height:1.7}
+.registration-field input:focus,.registration-field textarea:focus,.registration-field select:focus{border-color:#9c7c48;box-shadow:0 0 0 2px #a4875629}
+.registration-field small,.field-hint{display:block;margin:8px 0 0;color:#827968;font-size:10px;line-height:1.7}
+.field-hint{margin:-4px 0 12px}
+.registration-privacy-note{font-size:11px;line-height:1.8;color:#777061;margin:4px 0 20px}
+.registration-submit{border:0;cursor:pointer;min-width:210px}
+.registration-submit:disabled{opacity:.65;cursor:wait;transform:none}
+.registration-status{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;margin:0 0 18px;font-size:12px;line-height:1.7}
+.registration-status.success{background:#e2eadc;color:#2e512f;border:1px solid #b5c8ab}
+.registration-status.error{background:#f2e2d9;color:#7e3427;border:1px solid #d9b4a8}
+.registration-footnote{font-size:10px;line-height:1.8;color:#827968;max-width:510px}
+.registration-honeypot{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+.registration-spinner{animation:registration-spin 1s linear infinite}
+.registration-footer{border-top:1px solid var(--line);padding:23px 25px;text-align:center;font-size:9px;color:#827968}
+@keyframes registration-spin{to{transform:rotate(360deg)}}
+@media(max-width:600px){.registration-header{height:69px;padding:0 20px}.registration-header .brand-name{font-size:9px}.registration-back{font-size:10px}.registration-intro{padding:54px 22px 28px}.registration-form{padding:0 22px 55px}.registration-options{grid-template-columns:1fr}.registration-option{min-height:44px}.registration-section{padding-top:25px}.registration-submit{width:100%}}
+@media(prefers-reduced-motion:reduce){.registration-option,.registration-spinner{animation:none;transition:none}}
