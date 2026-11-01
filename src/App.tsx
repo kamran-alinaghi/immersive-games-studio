@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import RegistrationForm from './RegistrationForm';
 import {
   ArrowDown, ArrowRight, CalendarDays, Check, ChevronDown, Compass,
   Menu, Sparkles, Trophy, Users, X
@@ -34,18 +35,23 @@ const details: { id: DetailId; number: string; title: string; summary: string; b
 function App() {
   const [expanded, setExpanded] = useState<DetailId[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [registrationNotice, setRegistrationNotice] = useState(false);
+  const [isRegistrationPage, setIsRegistrationPage] = useState(window.location.hash === '#/register');
+
+  useEffect(() => {
+    const syncRoute = () => setIsRegistrationPage(window.location.hash === '#/register');
+    window.addEventListener('hashchange', syncRoute);
+    return () => window.removeEventListener('hashchange', syncRoute);
+  }, []);
 
   const toggleDetail = (id: DetailId) => {
     setExpanded(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   };
 
-  const registrationHref = questionnaireUrl || '#registration';
+  const registrationHref = '#/register';
 
-  const handleRegistrationClick = () => {
-    setMenuOpen(false);
-    if (!questionnaireUrl) setRegistrationNotice(true);
-  };
+  const handleRegistrationClick = () => setMenuOpen(false);
+
+  if (isRegistrationPage) return <RegistrationForm />;
 
   return (
     <div className="site-shell">
@@ -159,7 +165,6 @@ function App() {
           <h2>Ready to take<br /><i>the first step?</i></h2>
           <p className="cta-copy">Tell us a little about yourself. Start with the registration questionnaire and see whether this adventure is right for you.</p>
           <a className="button button-dark" href={registrationHref} onClick={handleRegistrationClick}>Start registration <ArrowRight size={16} /></a>
-          {registrationNotice && <p className="setup-note" role="status">The questionnaire link will be connected before launch. No information has been submitted.</p>}
           <p className="free-note"><Check size={13} /> FREE TO PARTICIPATE <span>✦</span> NO STORY SPOILERS</p>
         </section>
       </main>
