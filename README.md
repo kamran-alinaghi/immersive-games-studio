@@ -32,6 +32,14 @@ The form implements the approved questionnaire:
 - Free-text input has length limits; the email field uses browser email validation.
 - The form submits JSON to the server-side URL configured in `VITE_REGISTRATION_API_URL`.
 
+### Registration backend
+
+The Firebase Cloud Function named `submitRegistration` accepts `POST` requests, validates the approved questionnaire fields on the server, applies a basic per-IP rate limit, rejects invalid submissions, ignores submissions with the honeypot filled, and writes accepted applications to the private `registrations` Firestore collection. It does not return applicant data to the caller. The rate-limit collection is named `_registrationRateLimits` and stores a SHA-256 hash of the request IP rather than the raw IP address.
+
+The allowed browser origins currently include the default Firebase Hosting domains and local Vite development origins. Add any future custom website domain to `allowedOrigins` in `functions/src/index.ts` before using it.
+
+Deploy only after running the build and lint checks and testing with non-sensitive test data.
+
 ### Important: submission backend is not connected yet
 
 Until `VITE_REGISTRATION_API_URL` points to a working HTTPS endpoint, the form will explicitly tell applicants that their answers have **not** been sent or saved. Do not launch recruitment until the endpoint is implemented and tested.
