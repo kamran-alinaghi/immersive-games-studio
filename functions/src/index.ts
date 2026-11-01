@@ -65,7 +65,7 @@ const text = (value: unknown): value is string => typeof value === "string";
 const isOneOf = <T extends readonly string[]>(
   value: unknown,
   options: T,
-): value is T[number] => text(value) && options.includes(value);
+): value is T[number] => text(value) && options.includes(value as T[number]);
 
 type RegistrationPayload = {
   ageConfirmed: "Yes" | "No";
@@ -178,7 +178,8 @@ async function isRateLimited(ip: string): Promise<boolean> {
       now - windowStartedAt < windowMs;
 
     transaction.set(rateLimitRef, {
-      windowStartedAt: withinWindow ? windowStartedAt : now,
+      windowStartedAt: withinWindow && typeof windowStartedAt === "number" ?
+        windowStartedAt : now,
       count: withinWindow && typeof count === "number" ? count + 1 : 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
