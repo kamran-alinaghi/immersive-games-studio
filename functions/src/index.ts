@@ -1,8 +1,7 @@
 import {createHash} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
-import {logger} from "firebase-functions";
-import {setGlobalOptions} from "firebase-functions";
+import {logger, setGlobalOptions} from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
 
 if (getApps().length === 0) {
@@ -216,14 +215,18 @@ export const submitRegistration = onRequest(
 
     const validation = validatePayload(body);
     if (!validation.ok) {
-      response.status(400).json({error: "Please check your answers and try again."});
+      response.status(400).json({
+        error: "Please check your answers and try again.",
+      });
       return;
     }
 
     const ip = request.ip || "unknown";
     try {
       if (await isRateLimited(ip)) {
-        response.status(429).json({error: "Too many attempts. Please try again later."});
+        response.status(429).json({
+          error: "Too many attempts. Please try again later.",
+        });
         return;
       }
 
@@ -236,7 +239,9 @@ export const submitRegistration = onRequest(
       response.status(201).json({ok: true});
     } catch (error) {
       logger.error("Registration submission failed.", error);
-      response.status(500).json({error: "We could not submit your registration."});
+      response.status(500).json({
+        error: "We could not submit your registration.",
+      });
     }
   },
 );
