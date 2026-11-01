@@ -29,11 +29,11 @@ const areas = [
 ];
 
 const puzzleOptions = [
-  'Try a different approach',
+  'Try different approach',
   'Look at the clues again',
-  'Discuss it with the team',
+  'Discuss with team',
   'Focus harder',
-  'Look for a hint'
+  'Look for hint'
 ];
 
 const initialData: RegistrationData = {
@@ -179,10 +179,10 @@ function RegistrationForm() {
             <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={data.email} onChange={event => update('email', event.target.value)} />
           </div>
 
-          <ChoiceGroup label="Are you able to attend games and travel within Metro Vancouver when required?" name="travelMetroVancouver" value={data.travelMetroVancouver} options={['Yes', 'No']} onChange={value => update('travelMetroVancouver', value)} />
+          <ChoiceGroup label="Able to attend games and travel within Metro Vancouver when required?" name="travelMetroVancouver" value={data.travelMetroVancouver} options={['Yes', 'No']} onChange={value => update('travelMetroVancouver', value)} />
 
           <div className="registration-field">
-            <label htmlFor="area">Which area of Metro Vancouver do you live in? <span className="required-mark">*</span></label>
+            <label htmlFor="area">Area of Metro Vancouver <span className="required-mark">*</span></label>
             <select id="area" name="area" required value={data.area} onChange={event => update('area', event.target.value)}>
               <option value="">Select your area</option>
               {areas.map(area => <option value={area} key={area}>{area}</option>)}
@@ -193,7 +193,7 @@ function RegistrationForm() {
         <section className="registration-section">
           <p className="registration-section-number">02 — AVAILABILITY</p>
           <ChoiceGroup label="Can you commit to attending scheduled game sessions?" name="commitToSessions" value={data.commitToSessions} options={['Yes', 'No', 'Not sure']} onChange={value => update('commitToSessions', value)} />
-          <ChoiceGroup label="Generally, when are you available?" name="availability" value={data.availability} options={['Weekends', 'Long weekends', 'Both', 'Neither']} onChange={value => update('availability', value)} />
+          <ChoiceGroup label="Generally available on weekends and long weekends?" name="availability" value={data.availability} options={['Weekends', 'Long weekends', 'Both', 'Neither']} onChange={value => update('availability', value)} />
         </section>
 
         <section className="registration-section">
@@ -205,7 +205,7 @@ function RegistrationForm() {
           </div>
 
           <fieldset className="registration-fieldset">
-            <legend>What would you most likely do if you got stuck on a puzzle? <span className="required-mark">*</span></legend>
+            <legend>What would you most likely do if stuck on puzzle? <span className="required-mark">*</span></legend>
             <p className="field-hint">Select all that apply.</p>
             <div className="registration-options">
               {puzzleOptions.map(option => (
@@ -218,15 +218,15 @@ function RegistrationForm() {
           </fieldset>
 
           <ChoiceGroup label="How do you feel when you don't know what you're supposed to do next?" name="uncertaintyReaction" value={data.uncertaintyReaction} options={[
-            'I enjoy figuring it out',
-            'It is exciting, especially with a team',
-            'I prefer direction',
-            'I find it frustrating'
+            'Enjoy figuring it out',
+            'Exciting especially with team',
+            'Prefer direction',
+            'Frustrating'
           ]} onChange={value => update('uncertaintyReaction', value)} />
 
-          <ChoiceGroup label="Are you comfortable being recorded during the treasure hunt, with footage potentially shared on social media?" name="comfortableRecording" value={data.comfortableRecording} options={['Yes', 'No']} onChange={value => update('comfortableRecording', value)} />
+          <ChoiceGroup label="Comfortable being recorded during treasure hunt with footage potentially shared on social media?" name="comfortableRecording" value={data.comfortableRecording} options={['Yes', 'No']} onChange={value => update('comfortableRecording', value)} />
 
-          <ChoiceGroup label="Are you comfortable with activities that may involve the outdoors, interacting with strangers, unfamiliar places, or an immersive story?" name="comfortableExperience" value={data.comfortableExperience} options={['Yes', 'No']} onChange={value => update('comfortableExperience', value)} />
+          <ChoiceGroup label="Comfortable with activities possibly involving outdoors, interacting with strangers, unfamiliar places, unusual instructions, immersive story?" name="comfortableExperience" value={data.comfortableExperience} options={['Yes', 'No']} onChange={value => update('comfortableExperience', value)} />
         </section>
 
         <div className="registration-honeypot" aria-hidden="true">
