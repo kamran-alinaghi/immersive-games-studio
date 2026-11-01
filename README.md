@@ -1,6 +1,6 @@
-# Immersive Games Studio — Treasure Hunt Landing Page
+# Immersive Games Studio — Treasure Hunt Website
 
-A responsive React + TypeScript + Vite landing page for the Treasure Hunt experience. It intentionally avoids story and character spoilers.
+A responsive React + TypeScript + Vite website for the Immersive Games Studio treasure hunt. The public site intentionally avoids story and character spoilers.
 
 ## Requirements
 
@@ -15,17 +15,33 @@ cp .env.example .env
 npm run dev
 ```
 
-On Windows PowerShell, copy the environment template with:
+On Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-## Connect the existing questionnaire
+## Custom registration form
 
-Set `VITE_QUESTIONNAIRE_URL` in `.env` to the URL of your candidate questionnaire. The “Start registration” links will use that URL. If it is not configured, the page displays a notice and does not pretend that an application has been submitted.
+The homepage's “Start registration” links open the custom form at the hash route `#/register`, so it works without requiring host-side rewrite rules.
 
-Restart the dev server after changing `.env`.
+The form implements the approved questionnaire:
+- Questions 2, 3, and 8 are free-text fields.
+- Question 9 is multiple-choice (checkboxes).
+- The remaining questions are single-choice.
+- Free-text input has length limits; the email field uses browser email validation.
+- The form submits JSON to the server-side URL configured in `VITE_REGISTRATION_API_URL`.
+
+### Important: submission backend is not connected yet
+
+Until `VITE_REGISTRATION_API_URL` points to a working HTTPS endpoint, the form will explicitly tell applicants that their answers have **not** been sent or saved. Do not launch recruitment until the endpoint is implemented and tested.
+
+The endpoint must validate every field on the server, allow only the expected choice values, enforce text length limits, reject submissions with the honeypot field populated, apply reasonable rate limiting, and save records privately. It should return a successful 2xx response only after the record is safely stored. Never put Firestore admin credentials, service-account keys, or other secrets in a `VITE_` variable or client-side code. Public users must not be able to read applicant records.
+
+The expected request JSON uses these fields:
+`ageConfirmed`, `fullName`, `email`, `travelMetroVancouver`, `area`, `commitToSessions`, `availability`, `motivation`, `puzzleApproaches` (array), `uncertaintyReaction`, `comfortableRecording`, `comfortableExperience`, and `website` (honeypot; should be empty).
+
+After setting `VITE_REGISTRATION_API_URL`, restart the Vite development server.
 
 ## Build
 
@@ -36,11 +52,10 @@ npm run preview
 
 ## Before launch
 
-- Connect and test the real questionnaire URL.
-- Replace the illustrative CSS map artwork with approved brand imagery if desired.
-- Add verified Contact, Privacy Policy, and Terms URLs.
+- Implement and configure the secure submission endpoint and private storage.
+- Test valid submissions, invalid answers, long text, spam protection, service errors, and mobile layouts.
+- Publish verified Contact, Privacy Policy, and Terms / Participation Rules information.
 - Review prize wording and recording/publication disclosure against the finalized rules and consent documents.
-- Confirm the exact hint deduction and prize calculation in the official rules.
-- Review privacy, recording, publication, and participant consent requirements before recruiting.
+- Confirm privacy, retention, recording, publication, and participant consent processes before recruiting.
 
-The landing page does not collect questionnaire answers. Applications are intended to be handled by the existing questionnaire.
+The registration form does not collect formal recording consent. Applying is not confirmation of selection or participation.
