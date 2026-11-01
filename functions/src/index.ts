@@ -82,6 +82,12 @@ type RegistrationPayload = {
   comfortableExperience: "Yes" | "No";
 };
 
+/**
+ * Validates an untrusted registration request body.
+ * @param {unknown} body - The request body to validate.
+ * @return {{ok: true, value: RegistrationPayload} | {ok: false}}
+ * The validated payload or a validation failure.
+ */
 function validatePayload(body: unknown):
   {ok: true; value: RegistrationPayload} | {ok: false} {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -151,6 +157,11 @@ function validatePayload(body: unknown):
   };
 }
 
+/**
+ * Checks and updates the hourly submission limit for an IP address.
+ * @param {string} ip - The request IP address to check.
+ * @return {Promise<boolean>} Whether the address has exceeded its limit.
+ */
 async function isRateLimited(ip: string): Promise<boolean> {
   const ipHash = createHash("sha256").update(ip).digest("hex");
   const rateLimitRef = db.collection("_registrationRateLimits").doc(ipHash);
