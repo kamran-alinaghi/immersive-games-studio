@@ -154,3 +154,7 @@ button{font:inherit}
 @keyframes registration-spin{to{transform:rotate(360deg)}}
 @media(max-width:600px){.registration-header{height:69px;padding:0 20px}.registration-header .brand-name{font-size:9px}.registration-back{font-size:10px}.registration-intro{padding:54px 22px 28px}.registration-form{padding:0 22px 55px}.registration-options{grid-template-columns:1fr}.registration-option{min-height:44px}.registration-section{padding-top:25px}.registration-submit{width:100%}}
 @media(prefers-reduced-motion:reduce){.registration-option,.registration-spinner{animation:none;transition:none}}
+
+.registration-field input.registration-email-invalid{border-color:#b23b32;background:#fbefec;box-shadow:0 0 0 1px #b23b3233}
+.registration-field input.registration-email-invalid:focus{border-color:#b23b32;box-shadow:0 0 0 2px #b23b3229}
+.registration-field small.registration-email-hint-invalid{color:#a32f27;font-weight:600}
