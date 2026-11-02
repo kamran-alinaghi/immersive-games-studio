@@ -19,7 +19,7 @@ type RegistrationData = {
 };
 
 const apiUrl = import.meta.env.VITE_REGISTRATION_API_URL?.trim();
-const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const areas = [
   'Anmore', 'Belcarra', 'Bowen Island', 'Burnaby', 'Coquitlam', 'Delta',
@@ -187,7 +187,7 @@ function RegistrationForm() {
 
           <div className="registration-field">
             <label htmlFor="email">Email <span className="required-mark">*</span></label>
-            <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}" title="Enter an email address in the format name@example.com." aria-invalid={emailHasFormatError} className={emailHasFormatError ? 'registration-email-invalid' : undefined} value={data.email} onChange={event => update('email', event.target.value)} />
+            <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Enter an email address in the format name@example.com." aria-invalid={emailHasFormatError} className={emailHasFormatError ? 'registration-email-invalid' : undefined} value={data.email} onChange={event => update('email', event.target.value)} />
             <small className={emailHasFormatError ? 'registration-email-hint-invalid' : undefined}>{emailHasFormatError ? 'Please enter a valid email address, such as name@example.com.' : 'Enter an address in the format name@example.com.'}</small>
           </div>
 
