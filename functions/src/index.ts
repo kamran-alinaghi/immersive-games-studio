@@ -48,18 +48,18 @@ const areas = [
 ] as const;
 
 const puzzleOptions = [
-  "Try different approach",
-  "Look at the clues again",
-  "Discuss with team",
-  "Focus harder",
-  "Look for hint",
+  "Try a different approach",
+  "Look at the clues again to see if I missed anything",
+  "Discuss it with the team",
+  "Focus harder and keep trying",
+  "Look for a hint",
 ] as const;
 
 const uncertaintyOptions = [
-  "Enjoy figuring it out",
-  "Exciting especially with team",
-  "Prefer direction",
-  "Frustrating",
+  "I enjoy figuring it out",
+  "I find it exciting, especially with a team",
+  "I prefer having some direction",
+  "I find it frustrating",
 ] as const;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
