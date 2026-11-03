@@ -15,6 +15,8 @@ setGlobalOptions({maxInstances: 3});
 const allowedOrigins = [
   "https://immersive-game-studio.web.app",
   "https://immersive-game-studio.firebaseapp.com",
+  "https://immersive-games.com",
+  "https://www.immersive-games.com",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ];
