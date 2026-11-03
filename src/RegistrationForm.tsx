@@ -250,7 +250,7 @@ function RegistrationForm() {
 
         {status === 'success' && (
           <div className="registration-status success" role="status">
-            <Check size={18} /> Your registration has been submitted successfully. Thank you for applying.
+            <Check size={18} /> Your application has been received. Thank you for applying. We’ll contact you by email regarding next steps.
           </div>
         )}
         {status === 'unconfigured' && (
