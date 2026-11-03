@@ -30,11 +30,11 @@ const areas = [
 ];
 
 const puzzleOptions = [
-  'Try different approach',
-  'Look at the clues again',
-  'Discuss with team',
-  'Focus harder',
-  'Look for hint'
+  'Try a different approach',
+  'Look at the clues again to see if I missed anything',
+  'Discuss it with the team',
+  'Focus harder and keep trying',
+  'Look for a hint'
 ];
 
 const initialData: RegistrationData = {
@@ -230,10 +230,10 @@ function RegistrationForm() {
           </fieldset>
 
           <ChoiceGroup label="How do you feel when you don't know what you're supposed to do next?" name="uncertaintyReaction" value={data.uncertaintyReaction} options={[
-            'Enjoy figuring it out',
-            'Exciting especially with team',
-            'Prefer direction',
-            'Frustrating'
+            'I enjoy figuring it out',
+            'I find it exciting, especially with a team',
+            'I prefer having some direction',
+            'I find it frustrating'
           ]} onChange={value => update('uncertaintyReaction', value)} />
 
           <ChoiceGroup label="Comfortable being recorded during treasure hunt with footage potentially shared on social media?" name="comfortableRecording" value={data.comfortableRecording} options={['Yes', 'No']} onChange={value => update('comfortableRecording', value)} />
