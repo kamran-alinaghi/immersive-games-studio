@@ -11,9 +11,9 @@ const details: { id: DetailId; number: string; title: string; summary: string; b
   {
     id: 'prize',
     number: '01',
-    title: 'The prize and optional hints',
-    summary: 'A chance to win $3,000 CAD per player. Hints are optional and come with a clearly explained trade-off.',
-    body: 'Participation is free. If the treasure is found, the prize can be up to $3,000 CAD per player, with a minimum of $1,000 CAD per player. If the treasure is not found, no prize is awarded. Your team may request hints. Each hint has a deduction based on how sensitive or crucial its information is. Before you accept a hint, you will be told exactly how much it would deduct from the prize. If the treasure is found, the prize will not fall below $1,000 CAD per player, regardless of the number of hints accepted.'
+    title: 'The prize',
+    summary: 'A chance to win $3,000 CAD per player. Full prize conditions will be shared by email.',
+    body: 'Participation is free. If the treasure is found, the prize can be up to $3,000 CAD per player, with a minimum of $1,000 CAD per player. If the treasure is not found, no prize is awarded. Further prize conditions will be explained by email before participation.'
   },
   {
     id: 'schedule',
@@ -100,7 +100,7 @@ function App() {
         </section>
 
         <section className="intro section-wrap" id="experience">
-          <div className="section-kicker">THE EXPERIENCE <span>—</span> 01</div>
+          <div className="section-kicker">THE EXPERIENCE</div>
           <div className="intro-grid">
             <h2>Not just a<br /><i>treasure hunt.</i></h2>
             <div className="intro-text">
@@ -118,7 +118,7 @@ function App() {
 
         <section className="prize-section" id="prize">
           <div className="prize-inner">
-            <div className="section-kicker section-kicker-light">THE REWARD <span>—</span> 02</div>
+            <div className="section-kicker section-kicker-light">THE REWARD</div>
             <div className="prize-grid">
               <div>
                 <p className="eyebrow eyebrow-light">FIND THE TREASURE</p>
@@ -126,8 +126,8 @@ function App() {
                 <p className="prize-per-player">PER PLAYER</p>
               </div>
               <div className="prize-description">
-                <h3>Every hint is a choice.</h3>
-                <p>Ask for help when a puzzle gets difficult—but every hint has a cost. Before accepting one, your team will know exactly how it changes the potential prize.</p>
+                <h3>The treasure awaits.</h3>
+                <p>A chance to win up to $3,000 CAD per player. Full prize conditions will be explained by email.</p>
                 <p className="prize-caveat">If the treasure is found, the prize is at least $1,000 CAD per player. If it is not found, no prize is awarded.</p>
               </div>
             </div>
