@@ -127,8 +127,7 @@ function App() {
               </div>
               <div className="prize-description">
                 <h3>The treasure awaits.</h3>
-                <p>A chance to win up to $3,000 CAD per player. Full prize conditions will be explained by email.</p>
-                <p className="prize-caveat">If the treasure is found, the prize is at least $1,000 CAD per player. If it is not found, no prize is awarded.</p>
+                <p>A chance to win up to $3,000 CAD per player.</p>
               </div>
             </div>
             <div className="prize-foot"><span>NO REGISTRATION FEE</span><span>THE OUTCOME DEPENDS ON FINDING THE TREASURE</span></div>
