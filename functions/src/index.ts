@@ -497,7 +497,7 @@ export const approveRegistration = onCall(
         <p>Please keep your Player ID safe. It will be used to identify you throughout the process.</p>
         <h3>Access Your Player Portal</h3>
         <p>You can now set your password and access your personal player portal using the link below:</p>
-        <p><a href="${passwordSetupLink}">Set Your Password &amp; Access Your Portal</a></p>
+        <p><a href="${passwordSetupLink.replace(/&/g, "&amp;")}">Set Your Password &amp; Access Your Portal</a></p>
         <p>Your portal will be your personal space for receiving information and completing the upcoming steps.</p>
         <h3>What Happens Next?</h3>
         <p>In the next stage, we'll send you another email with information about the interview process, including what to expect and how to prepare.</p>
