@@ -13,7 +13,8 @@
     "lucide-react": "^0.468.0",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "firebase": "^12.5.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
