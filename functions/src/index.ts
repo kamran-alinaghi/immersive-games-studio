@@ -306,6 +306,7 @@ export const updateRegistrationStatus = onCall(
       throw new HttpsError("invalid-argument", "A valid registration and status are required.");
     }
 
+    const status = data.status as RegistrationStatus;
     const registrationRef = db.collection("registrations").doc(registrationId);
     await db.runTransaction(async (transaction) => {
       const registration = await transaction.get(registrationRef);
@@ -313,7 +314,7 @@ export const updateRegistrationStatus = onCall(
         throw new HttpsError("not-found", "The application could not be found.");
       }
       transaction.update(registrationRef, {
-        status: data.status,
+        status,
         reviewedAt: FieldValue.serverTimestamp(),
         reviewedBy: request.auth!.uid,
       });
@@ -321,7 +322,7 @@ export const updateRegistrationStatus = onCall(
 
     logger.info("Registration status updated.", {
       registrationId,
-      status: data.status,
+      status,
       administratorUid: request.auth.uid,
     });
     return {ok: true};
