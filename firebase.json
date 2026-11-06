@@ -42,7 +42,13 @@
       "enabled": true,
       "port": 4000
     },
-    "singleProjectMode": true
+    "singleProjectMode": true,
+    "hosting": {
+      "port": 9099
+    },
+    "auth": {
+      "port": 9099
+    }
   },
   "firestore": {
     "rules": "firestore.rules"
