@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import RegistrationForm from './RegistrationForm';
+import AdminApp from './AdminApp';
 import {
   ArrowDown, ArrowRight, CalendarDays, Check, ChevronDown, Compass,
   Menu, Sparkles, Trophy, Users, X
@@ -34,10 +35,12 @@ const details: { id: DetailId; number: string; title: string; summary: string; b
 function App() {
   const [expanded, setExpanded] = useState<DetailId[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isRegistrationPage, setIsRegistrationPage] = useState(window.location.hash === '#/register');
+  const [route, setRoute] = useState(window.location.hash);
+  const isRegistrationPage = route === '#/register';
+  const isAdminPage = route === '#/admin';
 
   useEffect(() => {
-    const syncRoute = () => setIsRegistrationPage(window.location.hash === '#/register');
+    const syncRoute = () => setRoute(window.location.hash);
     window.addEventListener('hashchange', syncRoute);
     return () => window.removeEventListener('hashchange', syncRoute);
   }, []);
@@ -51,6 +54,7 @@ function App() {
   const handleRegistrationClick = () => setMenuOpen(false);
 
   if (isRegistrationPage) return <RegistrationForm />;
+  if (isAdminPage) return <AdminApp />;
 
   return (
     <div className="site-shell">
