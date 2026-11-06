@@ -68,7 +68,7 @@ function AdminApp() {
     if (!selected || approvingId) return;
     const isResend = selected.status === 'approved';
     const confirmed = window.confirm(isResend
-      ? `Resend the approval email to ${selected.email || 'this player'}? The existing Player ID and account will be reused.`
+      ? `Retry the approval email for ${selected.email || 'this player'}? The existing Player ID will be kept.`
       : `Approve ${selected.fullName || 'this applicant'} and assign a permanent Player ID? This action cannot be undone.`);
     if (!confirmed) return;
 
