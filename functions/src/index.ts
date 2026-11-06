@@ -1,14 +1,19 @@
 import {createHash, randomInt} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
+import {getAuth} from "firebase-admin/auth";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {logger, setGlobalOptions} from "firebase-functions";
+import {defineSecret} from "firebase-functions/params";
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
+import nodemailer from "nodemailer";
 
 if (getApps().length === 0) {
   initializeApp();
 }
 
 const db = getFirestore();
+const smtpUser = defineSecret("SMTP_USER");
+const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
 
 setGlobalOptions({maxInstances: 3});
 
@@ -331,86 +336,241 @@ export const updateRegistrationStatus = onCall(
 
 
 /**
- * Approves an applicant and assigns a permanent, unique Player ID.
- * Email delivery is intentionally a separate step; the ID is persisted first.
+ * Approves an applicant, creates its player account, and emails the password setup link.
+ * The Player ID and player record are persisted before any email is sent.
+ * Calling this again safely reuses the same account and Player ID and resends the email.
  */
-export const approveRegistration = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Sign in is required.");
-  }
-
-  const adminSnapshot = await db.collection("admins").doc(request.auth.uid).get();
-  if (!adminSnapshot.exists || adminSnapshot.data()?.active !== true) {
-    throw new HttpsError("permission-denied", "Administrator access is required.");
-  }
-
-  const data = request.data as {registrationId?: unknown};
-  const registrationId = typeof data?.registrationId === "string" ?
-    data.registrationId.trim() : "";
-  if (!registrationId || registrationId.length > 150) {
-    throw new HttpsError("invalid-argument", "A valid registration is required.");
-  }
-
-  const registrationRef = db.collection("registrations").doc(registrationId);
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-  const result = await db.runTransaction(async (transaction) => {
-    const registration = await transaction.get(registrationRef);
-    if (!registration.exists) {
-      throw new HttpsError("not-found", "The application could not be found.");
+export const approveRegistration = onCall(
+  {secrets: [smtpUser, smtpAppPassword]},
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Sign in is required.");
     }
 
-    const current = registration.data()!;
-    if (current.status === "approved" && typeof current.playerId === "string") {
-      return {playerId: current.playerId, alreadyApproved: true};
-    }
-    if (current.status === "rejected") {
-      throw new HttpsError("failed-precondition", "A rejected application cannot be approved.");
+    const adminSnapshot = await db.collection("admins").doc(request.auth.uid).get();
+    if (!adminSnapshot.exists || adminSnapshot.data()?.active !== true) {
+      throw new HttpsError("permission-denied", "Administrator access is required.");
     }
 
-    // Read candidate ID documents before performing any transaction writes.
-    let playerId = "";
-    let playerIdRef = db.collection("playerIds").doc();
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      let suffix = "";
-      for (let index = 0; index < 6; index += 1) {
-        suffix += alphabet[randomInt(alphabet.length)];
+    const data = request.data as {registrationId?: unknown};
+    const registrationId = typeof data?.registrationId === "string" ?
+      data.registrationId.trim() : "";
+    if (!registrationId || registrationId.length > 150) {
+      throw new HttpsError("invalid-argument", "A valid registration is required.");
+    }
+
+    const registrationRef = db.collection("registrations").doc(registrationId);
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    const approval = await db.runTransaction(async (transaction) => {
+      const registration = await transaction.get(registrationRef);
+      if (!registration.exists) {
+        throw new HttpsError("not-found", "The application could not be found.");
       }
-      const candidate = `IGS-${suffix}`;
-      const candidateRef = db.collection("playerIds").doc(candidate);
-      const existing = await transaction.get(candidateRef);
-      if (!existing.exists) {
-        playerId = candidate;
-        playerIdRef = candidateRef;
-        break;
+
+      const current = registration.data()!;
+      const email = typeof current.email === "string" ?
+        current.email.trim().toLowerCase() : "";
+      const fullName = typeof current.fullName === "string" ?
+        current.fullName.trim() : "";
+
+      if (!emailPattern.test(email) || !fullName) {
+        throw new HttpsError("failed-precondition", "The application is missing a valid name or email address.");
       }
-    }
+      if (current.status === "rejected") {
+        throw new HttpsError("failed-precondition", "A rejected application cannot be approved.");
+      }
 
-    if (!playerId) {
-      throw new HttpsError("resource-exhausted", "A unique Player ID could not be generated. Please try again.");
-    }
+      if (current.status === "approved" && typeof current.playerId === "string") {
+        return {
+          playerId: current.playerId,
+          alreadyApproved: true,
+          email,
+          fullName,
+        };
+      }
 
-    transaction.set(playerIdRef, {
-      registrationId,
-      createdAt: FieldValue.serverTimestamp(),
+      let playerId = "";
+      let playerIdRef = db.collection("playerIds").doc();
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        let suffix = "";
+        for (let index = 0; index < 6; index += 1) {
+          suffix += alphabet[randomInt(alphabet.length)];
+        }
+        const candidate = \`IGS-\${suffix}\`;
+        const candidateRef = db.collection("playerIds").doc(candidate);
+        const existing = await transaction.get(candidateRef);
+        if (!existing.exists) {
+          playerId = candidate;
+          playerIdRef = candidateRef;
+          break;
+        }
+      }
+
+      if (!playerId) {
+        throw new HttpsError("resource-exhausted", "A unique Player ID could not be generated. Please try again.");
+      }
+
+      transaction.set(playerIdRef, {
+        registrationId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      transaction.update(registrationRef, {
+        status: "approved",
+        playerId,
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewedBy: request.auth!.uid,
+        approvedAt: FieldValue.serverTimestamp(),
+        approvedBy: request.auth!.uid,
+      });
+
+      return {playerId, alreadyApproved: false, email, fullName};
     });
-    transaction.update(registrationRef, {
-      status: "approved",
-      playerId,
-      reviewedAt: FieldValue.serverTimestamp(),
-      reviewedBy: request.auth!.uid,
-      approvedAt: FieldValue.serverTimestamp(),
-      approvedBy: request.auth!.uid,
-    });
 
-    return {playerId, alreadyApproved: false};
-  });
+    try {
+      // A deterministic UID makes retries safe if a function stops after account creation.
+      const uid = \`player_\${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}\`;
+      const playerAuth = getAuth();
+      let playerUser;
+      try {
+        playerUser = await playerAuth.getUser(uid);
+      } catch (error) {
+        if ((error as {code?: string}).code !== "auth/user-not-found") {
+          throw error;
+        }
+        playerUser = await playerAuth.createUser({
+          uid,
+          email: approval.email,
+          displayName: approval.fullName,
+          emailVerified: false,
+          disabled: false,
+        });
+      }
 
-  logger.info("Applicant approved and Player ID assigned.", {
-    registrationId,
-    playerId: result.playerId,
-    alreadyApproved: result.alreadyApproved,
-    administratorUid: request.auth.uid,
-  });
-  return {ok: true, ...result};
-});
+      if (playerUser.email?.toLowerCase() !== approval.email) {
+        throw new Error("The player account email does not match the application email.");
+      }
+
+      const playerRef = db.collection("players").doc(uid);
+      const playerSnapshot = await playerRef.get();
+      if (playerSnapshot.exists && playerSnapshot.data()?.registrationId !== registrationId) {
+        throw new Error("The player account is linked to a different application.");
+      }
+      await playerRef.set({
+        uid,
+        playerId: approval.playerId,
+        email: approval.email,
+        fullName: approval.fullName,
+        registrationId,
+        status: "approved",
+        createdAt: playerSnapshot.exists ?
+          playerSnapshot.data()?.createdAt ?? FieldValue.serverTimestamp() :
+          FieldValue.serverTimestamp(),
+        approvedAt: FieldValue.serverTimestamp(),
+      }, {merge: true});
+
+      const portalUrl = "https://immersive-games.com/#/player";
+      const passwordSetupLink = await playerAuth.generatePasswordResetLink(
+        approval.email,
+        {url: portalUrl, handleCodeInApp: false},
+      );
+
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: {
+          user: smtpUser.value(),
+          pass: smtpAppPassword.value(),
+        },
+      });
+
+      const safeName = approval.fullName.replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character] ?? character);
+
+      const html = \`
+        <p>Congratulations!</p>
+        <p>Your application to Immersive Games Studio has been approved.</p>
+        <p>This is the first step in the process. There are a few more stages ahead, and we'll guide you through each one.</p>
+        <h3>Your Player ID</h3>
+        <p><strong>\${approval.playerId}</strong></p>
+        <p>Please keep your Player ID safe. It will be used to identify you throughout the process.</p>
+        <h3>Access Your Player Portal</h3>
+        <p>You can now set your password and access your personal player portal using the link below:</p>
+        <p><a href="\${passwordSetupLink}">Set Your Password &amp; Access Your Portal</a></p>
+        <p>Your portal will be your personal space for receiving information and completing the upcoming steps.</p>
+        <h3>What Happens Next?</h3>
+        <p>In the next stage, we'll send you another email with information about the interview process, including what to expect and how to prepare.</p>
+        <p>We'll guide you through each step and provide all the necessary details along the way.</p>
+        <h3>Choosing Your Teammates</h3>
+        <p>If you are selected to move forward, you'll have the opportunity to choose your teammates.</p>
+        <p>Your invited teammates will go through the same approval and interview process. They will only become part of your team if they also approve the invitation to join.</p>
+        <p>For now, congratulations on passing this first step. We'll be in touch with further instructions.</p>
+        <p>Immersive Games Studio</p>
+      \`;
+      const plainText = \`Congratulations!
+
+Your application to Immersive Games Studio has been approved.
+
+This is the first step in the process. There are a few more stages ahead, and we'll guide you through each one.
+
+Your Player ID
+\${approval.playerId}
+Please keep your Player ID safe. It will be used to identify you throughout the process.
+
+Access Your Player Portal
+You can now set your password and access your personal player portal using the link below:
+\${passwordSetupLink}
+Your portal will be your personal space for receiving information and completing the upcoming steps.
+
+What Happens Next?
+In the next stage, we'll send you another email with information about the interview process, including what to expect and how to prepare.
+We'll guide you through each step and provide all the necessary details along the way.
+
+Choosing Your Teammates
+If you are selected to move forward, you'll have the opportunity to choose your teammates.
+Your invited teammates will go through the same approval and interview process. They will only become part of your team if they also approve the invitation to join.
+
+For now, congratulations on passing this first step. We'll be in touch with further instructions.
+
+Immersive Games Studio\`;
+
+      await transporter.sendMail({
+        from: \`Immersive Games Studio <\${smtpUser.value()}>\`,
+        to: approval.email,
+        subject: "Your Application Has Been Approved",
+        text: plainText,
+        html: \`<div style="font-family:Arial,sans-serif;line-height:1.6;color:#242424;max-width:600px;margin:auto">\${html}</div>\`,
+      });
+
+      logger.info("Approval email sent.", {
+        registrationId,
+        playerId: approval.playerId,
+        alreadyApproved: approval.alreadyApproved,
+      });
+      return {
+        ok: true,
+        playerId: approval.playerId,
+        alreadyApproved: approval.alreadyApproved,
+        emailSent: true,
+      };
+    } catch (error) {
+      logger.error("Applicant approved, but player account setup or approval email failed.", {
+        registrationId,
+        playerId: approval.playerId,
+        error,
+      });
+      return {
+        ok: true,
+        playerId: approval.playerId,
+        alreadyApproved: approval.alreadyApproved,
+        emailSent: false,
+      };
+    }
+  },
+);
