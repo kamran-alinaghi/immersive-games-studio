@@ -83,7 +83,7 @@ function AdminApp() {
       setSelected(updated);
       setApprovalMessage(emailSent
         ? `Approval email sent. Player ID: ${playerId}`
-        : `Player ID ${playerId} is saved, but the email could not be sent. You can try resending it.`);
+        : `Player ID ${playerId} is saved, but account setup or email delivery failed. You can retry this action.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed. Verify administrator permissions.');
     } finally {
@@ -124,7 +124,7 @@ function AdminApp() {
       <div className="admin-answers">{Object.entries(selected).filter(([key]) => key !== 'id' && key !== 'createdAt' && key !== 'status' && key !== 'reviewedAt' && key !== 'reviewedBy').map(([key, value]) => <div key={key}><strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</strong><p>{Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}</p></div>)}<div><strong>Submitted</strong><p>{formatDate(selected.createdAt)}</p></div></div>
       {approvalMessage && <p className="admin-success" role="status">{approvalMessage}</p>}
       {selected.status === 'approved' && <div className="admin-player-id"><strong>Player ID</strong><p>{selected.playerId || 'No Player ID recorded'}</p></div>}
-      {selected.status === 'approved' ? <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id}>{approvingId === selected.id ? 'Sending…' : 'Resend Approval Email'}</button> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
+      {selected.status === 'approved' ? <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id}>{approvingId === selected.id ? 'Sending…' : 'Retry Approval Email'}</button> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
     </section></div>}
   </main>;
 }
