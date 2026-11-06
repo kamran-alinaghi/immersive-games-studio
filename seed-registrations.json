@@ -1,0 +1,36 @@
+[
+  {
+    "fullName": "John Smith",
+    "email": "john.smith@example.com",
+    "ageConfirmed": "Yes",
+    "travelMetroVancouver": "Yes",
+    "area": "Vancouver",
+    "commitToSessions": "Yes",
+    "availability": "Both",
+    "motivation": "I enjoy solving mysteries, exploring new places, and meeting people.",
+    "puzzleApproaches": [
+      "Discuss it with the team",
+      "Try a different approach"
+    ],
+    "uncertaintyReaction": "I find it exciting, especially with a team",
+    "comfortableRecording": "Yes",
+    "comfortableExperience": "Yes"
+  },
+  {
+    "fullName": "Sarah Johnson",
+    "email": "sarah.johnson@example.com",
+    "ageConfirmed": "Yes",
+    "travelMetroVancouver": "Yes",
+    "area": "Burnaby",
+    "commitToSessions": "Not sure",
+    "availability": "Weekends",
+    "motivation": "I love challenging experiences and working with other people.",
+    "puzzleApproaches": [
+      "Look at the clues again to see if I missed anything",
+      "Look for a hint"
+    ],
+    "uncertaintyReaction": "I enjoy figuring it out",
+    "comfortableRecording": "Yes",
+    "comfortableExperience": "No"
+  }
+]
