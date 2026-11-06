@@ -1,4 +1,4 @@
-import {createHash} from "node:crypto";
+import {createHash, randomInt} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {logger, setGlobalOptions} from "firebase-functions";
@@ -295,7 +295,7 @@ export const updateRegistrationStatus = onCall(
     const registrationId = typeof data?.registrationId === "string" ?
       data.registrationId.trim() : "";
     const allowedStatuses: RegistrationStatus[] = [
-      "new", "under_review", "approved", "rejected", "contacted",
+      "new", "under_review", "rejected", "contacted",
     ];
     if (
       !registrationId ||
@@ -328,3 +328,89 @@ export const updateRegistrationStatus = onCall(
     return {ok: true};
   },
 );
+
+
+/**
+ * Approves an applicant and assigns a permanent, unique Player ID.
+ * Email delivery is intentionally a separate step; the ID is persisted first.
+ */
+export const approveRegistration = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
+
+  const adminSnapshot = await db.collection("admins").doc(request.auth.uid).get();
+  if (!adminSnapshot.exists || adminSnapshot.data()?.active !== true) {
+    throw new HttpsError("permission-denied", "Administrator access is required.");
+  }
+
+  const data = request.data as {registrationId?: unknown};
+  const registrationId = typeof data?.registrationId === "string" ?
+    data.registrationId.trim() : "";
+  if (!registrationId || registrationId.length > 150) {
+    throw new HttpsError("invalid-argument", "A valid registration is required.");
+  }
+
+  const registrationRef = db.collection("registrations").doc(registrationId);
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  const result = await db.runTransaction(async (transaction) => {
+    const registration = await transaction.get(registrationRef);
+    if (!registration.exists) {
+      throw new HttpsError("not-found", "The application could not be found.");
+    }
+
+    const current = registration.data()!;
+    if (current.status === "approved" && typeof current.playerId === "string") {
+      return {playerId: current.playerId, alreadyApproved: true};
+    }
+    if (current.status === "rejected") {
+      throw new HttpsError("failed-precondition", "A rejected application cannot be approved.");
+    }
+
+    // Read candidate ID documents before performing any transaction writes.
+    let playerId = "";
+    let playerIdRef = db.collection("playerIds").doc();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      let suffix = "";
+      for (let index = 0; index < 6; index += 1) {
+        suffix += alphabet[randomInt(alphabet.length)];
+      }
+      const candidate = `IGS-${suffix}`;
+      const candidateRef = db.collection("playerIds").doc(candidate);
+      const existing = await transaction.get(candidateRef);
+      if (!existing.exists) {
+        playerId = candidate;
+        playerIdRef = candidateRef;
+        break;
+      }
+    }
+
+    if (!playerId) {
+      throw new HttpsError("resource-exhausted", "A unique Player ID could not be generated. Please try again.");
+    }
+
+    transaction.set(playerIdRef, {
+      registrationId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(registrationRef, {
+      status: "approved",
+      playerId,
+      reviewedAt: FieldValue.serverTimestamp(),
+      reviewedBy: request.auth!.uid,
+      approvedAt: FieldValue.serverTimestamp(),
+      approvedBy: request.auth!.uid,
+    });
+
+    return {playerId, alreadyApproved: false};
+  });
+
+  logger.info("Applicant approved and Player ID assigned.", {
+    registrationId,
+    playerId: result.playerId,
+    alreadyApproved: result.alreadyApproved,
+    administratorUid: request.auth.uid,
+  });
+  return {ok: true, ...result};
+});
