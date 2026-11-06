@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -53,7 +53,7 @@ function PlayerPortal() {
     return () => { active = false; };
   }, [user]);
 
-  const login = async (event: React.FormEvent) => {
+  const login = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError('');
