@@ -12,7 +12,7 @@ type Applicant = DocumentData & { id: string; fullName?: string; email?: string;
 const statuses: Status[] = ['new', 'under_review', 'approved', 'rejected', 'contacted'];
 const labels: Record<Status, string> = { new: 'New', under_review: 'Under Review', approved: 'Approved', rejected: 'Rejected', contacted: 'Contacted' };
 const updateApplicantStatus = httpsCallable<{ registrationId: string; status: Exclude<Status, 'approved'> }, { ok: boolean }>(functions, 'updateRegistrationStatus');
-const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string; alreadyApproved: boolean; emailSent: boolean }>(functions, 'approveRegistration');
+const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string; alreadyApproved: boolean; emailSent: boolean; emailSkipped?: boolean }>(functions, 'approveRegistration');
 
 function AdminApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -77,13 +77,15 @@ function AdminApp() {
     setApprovalMessage('');
     try {
       const result = await approveApplicant({ registrationId: selected.id });
-      const { playerId, emailSent } = result.data;
+      const { playerId, emailSent, emailSkipped } = result.data;
       const updated = { ...selected, status: 'approved' as Status, playerId };
       setApplicants(current => current.map(item => item.id === selected.id ? updated : item));
       setSelected(updated);
       setApprovalMessage(emailSent
         ? `Approval email sent. Player ID: ${playerId}`
-        : `Player ID ${playerId} is saved, but account setup or email delivery failed. You can retry this action.`);
+        : emailSkipped
+          ? `Player ID ${playerId} is saved. The local emulator intentionally skipped account creation and email delivery.`
+          : `Player ID ${playerId} is saved, but account setup or email delivery failed. You can retry this action.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed. Verify administrator permissions.');
     } finally {
