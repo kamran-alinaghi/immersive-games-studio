@@ -12,7 +12,7 @@ type Applicant = DocumentData & { id: string; fullName?: string; email?: string;
 const statuses: Status[] = ['new', 'under_review', 'approved', 'rejected', 'contacted'];
 const labels: Record<Status, string> = { new: 'New', under_review: 'Under Review', approved: 'Approved', rejected: 'Rejected', contacted: 'Contacted' };
 const updateApplicantStatus = httpsCallable<{ registrationId: string; status: Exclude<Status, 'approved'> }, { ok: boolean }>(functions, 'updateRegistrationStatus');
-const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string; alreadyApproved: boolean }>(functions, 'approveRegistration');
+const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string; alreadyApproved: boolean; emailSent: boolean }>(functions, 'approveRegistration');
 
 function AdminApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -65,8 +65,11 @@ function AdminApp() {
   };
 
   const approveSelectedApplicant = async () => {
-    if (!selected || selected.status === 'approved' || approvingId) return;
-    const confirmed = window.confirm(`Approve ${selected.fullName || 'this applicant'} and assign a permanent Player ID? This action cannot be undone.`);
+    if (!selected || approvingId) return;
+    const isResend = selected.status === 'approved';
+    const confirmed = window.confirm(isResend
+      ? `Resend the approval email to ${selected.email || 'this player'}? The existing Player ID and account will be reused.`
+      : `Approve ${selected.fullName || 'this applicant'} and assign a permanent Player ID? This action cannot be undone.`);
     if (!confirmed) return;
 
     setApprovingId(selected.id);
@@ -74,11 +77,13 @@ function AdminApp() {
     setApprovalMessage('');
     try {
       const result = await approveApplicant({ registrationId: selected.id });
-      const { playerId } = result.data;
+      const { playerId, emailSent } = result.data;
       const updated = { ...selected, status: 'approved' as Status, playerId };
       setApplicants(current => current.map(item => item.id === selected.id ? updated : item));
       setSelected(updated);
-      setApprovalMessage(`Applicant approved. Player ID: ${playerId}`);
+      setApprovalMessage(emailSent
+        ? `Approval email sent. Player ID: ${playerId}`
+        : `Player ID ${playerId} is saved, but the email could not be sent. You can try resending it.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed. Verify administrator permissions.');
     } finally {
@@ -118,7 +123,8 @@ function AdminApp() {
       <div className="admin-status-control"><label htmlFor="app-status">Application status</label><select id="app-status" value={selected.status ?? 'new'} disabled={savingId === selected.id} onChange={e => void changeStatus(selected, e.target.value as Exclude<Status, 'approved'>)}>{statuses.map(s => <option key={s} value={s} disabled={s === 'approved'}>{labels[s]}</option>)}</select>{savingId === selected.id && <small>Saving…</small>}</div>
       <div className="admin-answers">{Object.entries(selected).filter(([key]) => key !== 'id' && key !== 'createdAt' && key !== 'status' && key !== 'reviewedAt' && key !== 'reviewedBy').map(([key, value]) => <div key={key}><strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</strong><p>{Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}</p></div>)}<div><strong>Submitted</strong><p>{formatDate(selected.createdAt)}</p></div></div>
       {approvalMessage && <p className="admin-success" role="status">{approvalMessage}</p>}
-      {selected.status === 'approved' ? <div className="admin-player-id"><strong>Player ID</strong><p>{selected.playerId || 'No Player ID recorded'}</p></div> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
+      {selected.status === 'approved' && <div className="admin-player-id"><strong>Player ID</strong><p>{selected.playerId || 'No Player ID recorded'}</p></div>}
+      {selected.status === 'approved' ? <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id}>{approvingId === selected.id ? 'Sending…' : 'Resend Approval Email'}</button> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
     </section></div>}
   </main>;
 }
