@@ -430,6 +430,22 @@ export const approveRegistration = onCall(
       return {playerId, alreadyApproved: false, email, fullName};
     });
 
+    // The local Functions emulator must not create accounts in production Firebase Auth
+    // or send real emails. It still exercises approval and Player ID persistence.
+    if (process.env.FUNCTIONS_EMULATOR === "true") {
+      logger.info("Emulator run: player account creation and approval email were skipped.", {
+        registrationId,
+        playerId: approval.playerId,
+      });
+      return {
+        ok: true,
+        playerId: approval.playerId,
+        alreadyApproved: approval.alreadyApproved,
+        emailSent: false,
+        emailSkipped: true,
+      };
+    }
+
     try {
       // A deterministic UID makes retries safe if a function stops after account creation.
       const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
