@@ -400,7 +400,7 @@ export const approveRegistration = onCall(
         for (let index = 0; index < 6; index += 1) {
           suffix += alphabet[randomInt(alphabet.length)];
         }
-        const candidate = \`IGS-\${suffix}\`;
+        const candidate = \`IGS-${suffix}\`;
         const candidateRef = db.collection("playerIds").doc(candidate);
         const existing = await transaction.get(candidateRef);
         if (!existing.exists) {
@@ -432,7 +432,7 @@ export const approveRegistration = onCall(
 
     try {
       // A deterministic UID makes retries safe if a function stops after account creation.
-      const uid = \`player_\${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}\`;
+      const uid = \`player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}\`;
       const playerAuth = getAuth();
       let playerUser;
       try {
@@ -493,11 +493,11 @@ export const approveRegistration = onCall(
         <p>Your application to Immersive Games Studio has been approved.</p>
         <p>This is the first step in the process. There are a few more stages ahead, and we'll guide you through each one.</p>
         <h3>Your Player ID</h3>
-        <p><strong>\${approval.playerId}</strong></p>
+        <p><strong>${approval.playerId}</strong></p>
         <p>Please keep your Player ID safe. It will be used to identify you throughout the process.</p>
         <h3>Access Your Player Portal</h3>
         <p>You can now set your password and access your personal player portal using the link below:</p>
-        <p><a href="\${passwordSetupLink}">Set Your Password &amp; Access Your Portal</a></p>
+        <p><a href="${passwordSetupLink}">Set Your Password &amp; Access Your Portal</a></p>
         <p>Your portal will be your personal space for receiving information and completing the upcoming steps.</p>
         <h3>What Happens Next?</h3>
         <p>In the next stage, we'll send you another email with information about the interview process, including what to expect and how to prepare.</p>
@@ -515,12 +515,12 @@ Your application to Immersive Games Studio has been approved.
 This is the first step in the process. There are a few more stages ahead, and we'll guide you through each one.
 
 Your Player ID
-\${approval.playerId}
+${approval.playerId}
 Please keep your Player ID safe. It will be used to identify you throughout the process.
 
 Access Your Player Portal
 You can now set your password and access your personal player portal using the link below:
-\${passwordSetupLink}
+${passwordSetupLink}
 Your portal will be your personal space for receiving information and completing the upcoming steps.
 
 What Happens Next?
@@ -536,11 +536,11 @@ For now, congratulations on passing this first step. We'll be in touch with furt
 Immersive Games Studio\`;
 
       await transporter.sendMail({
-        from: \`Immersive Games Studio <\${smtpUser.value()}>\`,
+        from: \`Immersive Games Studio <${smtpUser.value()}>\`,
         to: approval.email,
         subject: "Your Application Has Been Approved",
         text: plainText,
-        html: \`<div style="font-family:Arial,sans-serif;line-height:1.6;color:#242424;max-width:600px;margin:auto">\${html}</div>\`,
+        html: \`<div style="font-family:Arial,sans-serif;line-height:1.6;color:#242424;max-width:600px;margin:auto">${html}</div>\`,
       });
 
       logger.info("Approval email sent.", {
