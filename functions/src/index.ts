@@ -2,7 +2,7 @@ import {createHash} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {logger, setGlobalOptions} from "firebase-functions";
-import {onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -270,5 +270,60 @@ export const submitRegistration = onRequest(
         error: "We could not submit your registration.",
       });
     }
+  },
+);
+
+
+type RegistrationStatus = "new" | "under_review" | "approved" | "rejected" | "contacted";
+
+/**
+ * Updates an application status after verifying the caller is an active administrator.
+ * All authorization and mutation logic stays on the trusted backend.
+ */
+export const updateRegistrationStatus = onCall(
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Sign in is required.");
+    }
+
+    const adminSnapshot = await db.collection("admins").doc(request.auth.uid).get();
+    if (!adminSnapshot.exists || adminSnapshot.data()?.active !== true) {
+      throw new HttpsError("permission-denied", "Administrator access is required.");
+    }
+
+    const data = request.data as {registrationId?: unknown; status?: unknown};
+    const registrationId = typeof data?.registrationId === "string" ?
+      data.registrationId.trim() : "";
+    const allowedStatuses: RegistrationStatus[] = [
+      "new", "under_review", "approved", "rejected", "contacted",
+    ];
+    if (
+      !registrationId ||
+      registrationId.length > 150 ||
+      typeof data?.status !== "string" ||
+      !allowedStatuses.includes(data.status as RegistrationStatus)
+    ) {
+      throw new HttpsError("invalid-argument", "A valid registration and status are required.");
+    }
+
+    const registrationRef = db.collection("registrations").doc(registrationId);
+    await db.runTransaction(async (transaction) => {
+      const registration = await transaction.get(registrationRef);
+      if (!registration.exists) {
+        throw new HttpsError("not-found", "The application could not be found.");
+      }
+      transaction.update(registrationRef, {
+        status: data.status,
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewedBy: request.auth!.uid,
+      });
+    });
+
+    logger.info("Registration status updated.", {
+      registrationId,
+      status: data.status,
+      administratorUid: request.auth.uid,
+    });
+    return {ok: true};
   },
 );
