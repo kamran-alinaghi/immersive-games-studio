@@ -67,3 +67,21 @@ npm run preview
 - Confirm privacy, retention, recording, publication, and participant consent processes before recruiting.
 
 The registration form does not collect formal recording consent. Applying is not confirmation of selection or participation.
+
+
+## Administrator dashboard (feature branch)
+
+The administrator interface is available at `#/admin`. It uses Firebase Authentication email/password sign-in and reads registrations directly from Firestore under restrictive security rules. Status changes are performed by the `updateRegistrationStatus` callable Cloud Function, which independently verifies the caller against the server-side `admins/{uid}` record.
+
+### Setup before testing
+
+1. In Firebase Authentication, enable the Email/Password provider and create the administrator account.
+2. Copy the administrator's Firebase Authentication UID.
+3. In Firestore, create `admins/{uid}` with exactly `{ "active": true }`. Do not expose this collection to public writes; the rules allow an authenticated user to read only their own admin record and prohibit client writes.
+4. Copy the Firebase web app's API key, auth domain, project ID, and app ID into the four `VITE_FIREBASE_*` variables in `.env`. These are Firebase's public web configuration values, not service-account secrets.
+5. Run `npm install` to install the Firebase client SDK and refresh the root lockfile, then run `npm run build`.
+6. Deploy Firestore rules and Functions only after reviewing them: `firebase deploy --only firestore:rules,functions`. Do not deploy as part of this code change without an explicit production approval.
+
+Open `https://your-domain/#/admin` to sign in. The initial implementation supports applicant listing, search, status filtering, viewing questionnaire fields, and backend-authorized status updates. Supported statuses are `new`, `under_review`, `approved`, `rejected`, and `contacted`.
+
+**Important:** Approval currently changes the application status only. It does not yet create a player account, assign a player ID, or send an approval email; those belong to the next milestone. The dashboard assumes the existing registration documents contain `createdAt`, `fullName`, and `email` fields. Records missing `createdAt` may not appear in the ordered query until normalized.
