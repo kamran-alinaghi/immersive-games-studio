@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import RegistrationForm from './RegistrationForm';
 import AdminApp from './AdminApp';
+import PlayerPortal from './PlayerPortal';
 import {
   ArrowDown, ArrowRight, CalendarDays, Check, ChevronDown, Compass,
   Menu, Sparkles, Trophy, Users, X
@@ -38,6 +39,7 @@ function App() {
   const [route, setRoute] = useState(window.location.hash);
   const isRegistrationPage = route === '#/register';
   const isAdminPage = route === '#/admin';
+  const isPlayerPage = route === '#/player';
 
   useEffect(() => {
     const syncRoute = () => setRoute(window.location.hash);
@@ -55,6 +57,7 @@ function App() {
 
   if (isRegistrationPage) return <RegistrationForm />;
   if (isAdminPage) return <AdminApp />;
+  if (isPlayerPage) return <PlayerPortal />;
 
   return (
     <div className="site-shell">
