@@ -5,31 +5,80 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // The admins collection is the single source of truth for admin access.
     function isActiveAdmin() {
       return signedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
+        && exists(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        ).data.active == true;
     }
 
-    // Admin status is provisioned out-of-band by the project owner.
+    // Admin records are provisioned out-of-band by the project owner.
+    // A signed-in user can only read their own admin record.
     match /admins/{adminUid} {
       allow get: if signedIn() && request.auth.uid == adminUid;
       allow list, create, update, delete: if false;
     }
 
-    // Applicant data is private. Administrators may read it; all mutations
-    // are performed by trusted Cloud Functions using the Admin SDK.
+    // Applicant records are read-only from clients. Trusted Cloud Functions
+    // use the Admin SDK to create registrations and update their status.
     match /registrations/{registrationId} {
       allow get, list: if isActiveAdmin();
       allow create, update, delete: if false;
     }
 
-    // Rate-limit metadata must never be readable or writable by clients.
+    match /players/{uid} {
+      allow read: if signedIn()
+        && (request.auth.uid == uid || isActiveAdmin());
+      allow create, update, delete: if false;
+    }
+
+    match /videos/{videoId} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || isActiveAdmin());
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.playerId
+          == get(
+            /databases/$(database)/documents/players/$(request.auth.uid)
+          ).data.playerId
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'playerId',
+          'name',
+          'size',
+          'contentType',
+          'storagePath',
+          'createdAt'
+        ])
+        && request.resource.data.size is int
+        && request.resource.data.size > 0
+        && request.resource.data.size <= 262144000
+        && request.resource.data.contentType in [
+          'video/mp4',
+          'video/quicktime',
+          'video/webm'
+        ]
+        && request.resource.data.storagePath.matches(
+          'players/' + request.auth.uid + '/videos/.*'
+        );
+
+      allow update: if isActiveAdmin();
+
+      allow delete: if signedIn()
+        && (resource.data.uid == request.auth.uid || isActiveAdmin());
+    }
+
+    // Registration rate-limit metadata must remain inaccessible to clients.
     match /_registrationRateLimits/{documentId} {
       allow read, write: if false;
     }
 
-    // Deny access to all other collections until explicit rules are added.
+    // Deny everything not explicitly allowed above.
     match /{document=**} {
       allow read, write: if false;
     }
