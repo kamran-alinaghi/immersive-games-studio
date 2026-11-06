@@ -318,6 +318,9 @@ export const updateRegistrationStatus = onCall(
       if (!registration.exists) {
         throw new HttpsError("not-found", "The application could not be found.");
       }
+      if (registration.data()?.status === "approved") {
+        throw new HttpsError("failed-precondition", "An approved application cannot be moved back to another status.");
+      }
       transaction.update(registrationRef, {
         status,
         reviewedAt: FieldValue.serverTimestamp(),
@@ -484,14 +487,6 @@ export const approveRegistration = onCall(
           pass: smtpAppPassword.value(),
         },
       });
-
-      const safeName = approval.fullName.replace(/[&<>"']/g, (character) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[character] ?? character);
 
       const html = \`
         <p>Congratulations!</p>
