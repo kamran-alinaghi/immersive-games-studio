@@ -339,6 +339,81 @@ export const updateRegistrationStatus = onCall(
 
 
 /**
+ * Resolves a Player ID to its Firebase Authentication email for password-based sign-in.
+ * The email is returned only after the ID maps to an approved registration and player record.
+ */
+export const resolvePlayerLogin = onCall(async (request) => {
+  const data = request.data as {playerId?: unknown};
+  const playerId = typeof data?.playerId === "string" ?
+    data.playerId.trim().toUpperCase() : "";
+
+  if (!/^IGS-[A-Z0-9]{6}$/.test(playerId)) {
+    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  }
+
+  // Limit ID lookups to make automated Player ID enumeration impractical.
+  const ip = request.rawRequest.ip || "unknown";
+  const ipHash = createHash("sha256").update(ip).digest("hex");
+  const rateLimitRef = db.collection("_playerLoginRateLimits").doc(ipHash);
+  const now = Date.now();
+  const allowed = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(rateLimitRef);
+    const current = snapshot.data();
+    const withinWindow =
+      typeof current?.windowStartedAt === "number" &&
+      now - current.windowStartedAt < 60_000;
+    const count = withinWindow && typeof current?.count === "number" ?
+      current.count : 0;
+
+    if (count >= 10) return false;
+
+    transaction.set(rateLimitRef, {
+      windowStartedAt: withinWindow ? current!.windowStartedAt : now,
+      count: count + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+
+  if (!allowed) {
+    throw new HttpsError("resource-exhausted", "Too many sign-in attempts. Please wait and try again.");
+  }
+
+  const idSnapshot = await db.collection("playerIds").doc(playerId).get();
+  const registrationId = idSnapshot.data()?.registrationId;
+  if (!idSnapshot.exists || typeof registrationId !== "string") {
+    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  }
+
+  const registrationRef = db.collection("registrations").doc(registrationId);
+  const registrationSnapshot = await registrationRef.get();
+  const registration = registrationSnapshot.data();
+  if (
+    !registrationSnapshot.exists ||
+    registration?.status !== "approved" ||
+    registration?.playerId !== playerId
+  ) {
+    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  }
+
+  const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
+  const playerSnapshot = await db.collection("players").doc(uid).get();
+  const email = playerSnapshot.data()?.email;
+
+  if (
+    !playerSnapshot.exists ||
+    playerSnapshot.data()?.status !== "approved" ||
+    typeof email !== "string" ||
+    !emailPattern.test(email)
+  ) {
+    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  }
+
+  return {email: email.toLowerCase()};
+});
+
+
+/**
  * Approves an applicant, creates its player account, and emails the password setup link.
  * The Player ID and player record are persisted before any email is sent.
  * Calling this again safely reuses the same account and Player ID and resends the email.
@@ -430,22 +505,6 @@ export const approveRegistration = onCall(
       return {playerId, alreadyApproved: false, email, fullName};
     });
 
-    // The local Functions emulator must not create accounts in production Firebase Auth
-    // or send real emails. It still exercises approval and Player ID persistence.
-    if (process.env.FUNCTIONS_EMULATOR === "true") {
-      logger.info("Emulator run: player account creation and approval email were skipped.", {
-        registrationId,
-        playerId: approval.playerId,
-      });
-      return {
-        ok: true,
-        playerId: approval.playerId,
-        alreadyApproved: approval.alreadyApproved,
-        emailSent: false,
-        emailSkipped: true,
-      };
-    }
-
     try {
       // A deterministic UID makes retries safe if a function stops after account creation.
       const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
@@ -494,6 +553,23 @@ export const approveRegistration = onCall(
         {url: portalUrl, handleCodeInApp: false},
       );
 
+      // The Auth emulator creates a local player account and password setup link,
+      // but never sends real email or uses production SMTP credentials.
+      if (process.env.FUNCTIONS_EMULATOR === "true") {
+        logger.info("Emulator run: local player account created; approval email was skipped.", {
+          registrationId,
+          playerId: approval.playerId,
+          uid,
+        });
+        return {
+          ok: true,
+          playerId: approval.playerId,
+          alreadyApproved: approval.alreadyApproved,
+          emailSent: false,
+          emailSkipped: true,
+        };
+      }
+
       const transporter = nodemailer.createTransport({
         host: "smtp.gmail.com",
         port: 465,
@@ -510,7 +586,7 @@ export const approveRegistration = onCall(
         <p>This is the first step in the process. There are a few more stages ahead, and we'll guide you through each one.</p>
         <h3>Your Player ID</h3>
         <p><strong>${approval.playerId}</strong></p>
-        <p>Please keep your Player ID safe. It will be used to identify you throughout the process.</p>
+        <p>Please keep your Player ID safe. You will use this ID, together with your password, to sign in to your player portal.</p>
         <h3>Access Your Player Portal</h3>
         <p>You can now set your password and access your personal player portal using the link below:</p>
         <p><a href="${passwordSetupLink.replace(/&/g, "&amp;")}">Set Your Password &amp; Access Your Portal</a></p>
@@ -532,7 +608,7 @@ This is the first step in the process. There are a few more stages ahead, and we
 
 Your Player ID
 ${approval.playerId}
-Please keep your Player ID safe. It will be used to identify you throughout the process.
+Please keep your Player ID safe. You will use this ID, together with your password, to sign in to your player portal.
 
 Access Your Player Portal
 You can now set your password and access your personal player portal using the link below:
