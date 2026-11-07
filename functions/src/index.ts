@@ -451,8 +451,6 @@ export const resolvePlayerLogin = onCall(async (request) => {
 });
 
 
-
-
 /**
  * Approves an applicant, creates its player account, and emails the password setup link.
  * The Player ID and player record are persisted before any email is sent.
