@@ -461,12 +461,8 @@ export const signInPlayer = onCall(async (request) => {
   }
 
   try {
-    const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-    const authUrl = authHost ?
-      `http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key` :
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseWebApiKey.value()}`;
     const authResponse = await fetch(
-      authUrl,
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseWebApiKey.value()}`,
       {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -547,12 +543,6 @@ export const requestPlayerPasswordReset = onCall(
     return {ok: true};
   },
 );
-
-/**
- * Deprecated compatibility endpoint. It intentionally does not resolve Player IDs
- * or return account information. New clients use signInPlayer instead.
- */
-export const resolvePlayerLogin = onCall(async () => ({ok: true}));
 
 /**
  * Approves an applicant, creates its player account, and emails the password setup link.

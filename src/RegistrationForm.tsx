@@ -142,9 +142,11 @@ function RegistrationForm() {
       });
 
       if (!response.ok) {
-        throw new Error(response.status === 429
-          ? 'Too many attempts. Please wait a moment and try again.'
-          : 'We could not submit your registration. Please try again.');
+        throw new Error(response.status === 409
+          ? 'This email address has already been used to submit an application.'
+          : response.status === 429
+            ? 'Too many attempts. Please wait a moment and try again.'
+            : 'We could not submit your registration. Please try again.');
       }
 
       setStatus('success');
