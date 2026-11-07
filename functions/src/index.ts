@@ -14,7 +14,7 @@ if (getApps().length === 0) {
 const db = getFirestore();
 const smtpUser = defineSecret("SMTP_USER");
 const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
-const webApiKey  = defineString("WEB_API_KEY");
+const webApiKey = defineString("WEB_API_KEY");
 
 setGlobalOptions({maxInstances: 3});
 
