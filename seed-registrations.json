@@ -32,5 +32,39 @@
     "uncertaintyReaction": "I enjoy figuring it out",
     "comfortableRecording": "Yes",
     "comfortableExperience": "No"
+  },
+  {
+    "fullName": "Jonah Johnson",
+    "email": "jonah.johnson@example.com",
+    "ageConfirmed": "Yes",
+    "travelMetroVancouver": "Yes",
+    "area": "Burnaby",
+    "commitToSessions": "Not sure",
+    "availability": "Weekends",
+    "motivation": "I love challenging experiences and working with other people.",
+    "puzzleApproaches": [
+      "Look at the clues again to see if I missed anything",
+      "Look for a hint"
+    ],
+    "uncertaintyReaction": "I enjoy figuring it out",
+    "comfortableRecording": "Yes",
+    "comfortableExperience": "No"
+  },
+  {
+    "fullName": "Lisa Johnson",
+    "email": "lisa.johnson@example.com",
+    "ageConfirmed": "Yes",
+    "travelMetroVancouver": "Yes",
+    "area": "Burnaby",
+    "commitToSessions": "Not sure",
+    "availability": "Weekends",
+    "motivation": "I love challenging experiences and working with other people.",
+    "puzzleApproaches": [
+      "Look at the clues again to see if I missed anything",
+      "Look for a hint"
+    ],
+    "uncertaintyReaction": "I enjoy figuring it out",
+    "comfortableRecording": "Yes",
+    "comfortableExperience": "No"
   }
 ]
