@@ -7,8 +7,9 @@ import {
   type User,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ArrowLeft, LogOut, ShieldCheck } from 'lucide-react';
-import { auth, db } from './firebase';
+import { auth, db, functions } from './firebase';
 
 type PlayerProfile = {
   fullName?: string;
@@ -17,12 +18,17 @@ type PlayerProfile = {
   status?: string;
 };
 
+const resolvePlayerLogin = httpsCallable<
+  { playerId: string },
+  { email: string }
+>(functions, 'resolvePlayerLogin');
+
 function PlayerPortal() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [email, setEmail] = useState('');
+  const [playerId, setPlayerId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -59,7 +65,10 @@ function PlayerPortal() {
     setError('');
     setMessage('');
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const result = await resolvePlayerLogin({
+        playerId: playerId.trim().toUpperCase(),
+      });
+      await signInWithEmailAndPassword(auth, result.data.email, password);
       setPassword('');
     } catch {
       setError('Sign-in failed. Check your email and password, or use the password reset option.');
@@ -69,18 +78,21 @@ function PlayerPortal() {
   };
 
   const resetPassword = async () => {
-    if (!email.trim()) {
-      setError('Enter your email address first.');
+    if (!playerId.trim()) {
+      setError('Enter your Player ID first.');
       return;
     }
     setBusy(true);
     setError('');
     setMessage('');
     try {
-      await sendPasswordResetEmail(auth, email.trim(), {
+      const result = await resolvePlayerLogin({
+        playerId: playerId.trim().toUpperCase(),
+      });
+      await sendPasswordResetEmail(auth, result.data.email, {
         url: 'https://immersive-games.com/#/player',
       });
-      setMessage('If an account exists for that email, a password reset link will be sent.');
+      setMessage('If the Player ID is valid, a password reset link will be sent to the email address registered to that account.');
     } catch {
       setError('We could not send a password reset email. Please check the address and try again.');
     } finally {
@@ -99,7 +111,7 @@ function PlayerPortal() {
         <h1>Player portal</h1>
         <p className="admin-muted">Sign in to access your personal player space.</p>
         <form onSubmit={login}>
-          <label>Email<input type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} /></label>
+          <label>Player ID<input type="text" autoComplete="username" placeholder="IGS-XXXXXX" autoCapitalize="characters" spellCheck={false} required value={playerId} onChange={event => setPlayerId(event.target.value.toUpperCase())} /></label>
           <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label>
           {error && <p className="admin-error" role="alert">{error}</p>}
           {message && <p className="admin-success" role="status">{message}</p>}
