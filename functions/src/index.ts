@@ -430,18 +430,24 @@ export const resolvePlayerLogin = onCall(async (request) => {
 
   const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
   const playerSnapshot = await db.collection("players").doc(uid).get();
-  const email = playerSnapshot.data()?.email;
+  // The approved registration is the canonical source for the applicant's email.
+  // Older player documents may not contain the email field, so do not let a
+  // missing denormalized field break login or password-reset requests.
+  const registrationEmail = registration?.email;
+  const playerEmail = playerSnapshot.data()?.email;
 
   if (
     !playerSnapshot.exists ||
     playerSnapshot.data()?.status !== "approved" ||
-    typeof email !== "string" ||
-    !emailPattern.test(email)
+    typeof registrationEmail !== "string" ||
+    !emailPattern.test(registrationEmail.trim()) ||
+    (typeof playerEmail === "string" &&
+      playerEmail.trim().toLowerCase() !== registrationEmail.trim().toLowerCase())
   ) {
     throw new HttpsError("not-found", "Player ID or password is incorrect.");
   }
 
-  return {email: email.toLowerCase()};
+  return {email: registrationEmail.trim().toLowerCase()};
 });
 
 
