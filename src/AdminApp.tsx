@@ -84,7 +84,7 @@ function AdminApp() {
       setApprovalMessage(emailSent
         ? `Approval email sent. Player ID: ${playerId}`
         : emailSkipped
-          ? `Player ID ${playerId} is saved. The local emulator intentionally skipped account creation and email delivery.`
+          ? `Player ID ${playerId} is saved. The local player account was created. The emulator skipped real email delivery; use the player portal's password reset option to test password setup locally.`
           : `Player ID ${playerId} is saved, but account setup or email delivery failed. You can retry this action.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed. Verify administrator permissions.');
