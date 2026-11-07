@@ -68,7 +68,13 @@ function PlayerPortal() {
       const result = await resolvePlayerLogin({
         playerId: playerId.trim().toUpperCase(),
       });
-      await signInWithEmailAndPassword(auth, result.data.email, password);
+      const email = typeof result.data?.email === 'string'
+        ? result.data.email.trim()
+        : '';
+      if (!email) {
+        throw new Error('The player account does not have a valid email address.');
+      }
+      await signInWithEmailAndPassword(auth, email, password);
       setPassword('');
     } catch {
       setError('Sign-in failed. Check your email and password, or use the password reset option.');
@@ -89,7 +95,13 @@ function PlayerPortal() {
       const result = await resolvePlayerLogin({
         playerId: playerId.trim().toUpperCase(),
       });
-      await sendPasswordResetEmail(auth, result.data.email, {
+      const email = typeof result.data?.email === 'string'
+        ? result.data.email.trim()
+        : '';
+      if (!email) {
+        throw new Error('The player account does not have a valid email address.');
+      }
+      await sendPasswordResetEmail(auth, email, {
         url: 'https://immersive-games.com/#/player',
       });
       setMessage('If the Player ID is valid, a password reset link will be sent to the email address registered to that account.');
