@@ -1,5 +1,33 @@
+const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
+
+const projectRoot = path.resolve(__dirname, "../..");
+const envFile = path.join(projectRoot, ".env.seed");
+
+function loadSeedEnvironment(filePath) {
+  if (!fs.existsSync(filePath)) {
+    console.error("Missing .env.seed. Create it in the repository root using .env.seed.example.");
+    process.exit(1);
+  }
+
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator < 1) continue;
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) value = value.slice(1, -1);
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadSeedEnvironment(envFile);
 
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8081";

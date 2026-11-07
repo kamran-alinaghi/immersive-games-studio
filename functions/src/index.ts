@@ -3,7 +3,7 @@ import {getApps, initializeApp} from "firebase-admin/app";
 import {getAuth} from "firebase-admin/auth";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {logger, setGlobalOptions} from "firebase-functions";
-import {defineSecret} from "firebase-functions/params";
+import {defineSecret, defineString} from "firebase-functions/params";
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import nodemailer from "nodemailer";
 
@@ -14,6 +14,7 @@ if (getApps().length === 0) {
 const db = getFirestore();
 const smtpUser = defineSecret("SMTP_USER");
 const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
+const firebaseWebApiKey = defineString("FIREBASE_WEB_API_KEY");
 
 setGlobalOptions({maxInstances: 3});
 
@@ -206,6 +207,70 @@ async function isRateLimited(ip: string): Promise<boolean> {
   });
 }
 
+/**
+ * Applies a per-IP limit to player sign-in and password-reset attempts.
+ * @param {string} ip - The request IP address.
+ * @return {Promise<boolean>} Whether the request is within the limit.
+ */
+async function consumePlayerLoginAttempt(ip: string): Promise<boolean> {
+  const ipHash = createHash("sha256").update(ip).digest("hex");
+  const rateLimitRef = db.collection("_playerLoginRateLimits").doc(ipHash);
+  const now = Date.now();
+
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(rateLimitRef);
+    const current = snapshot.data();
+    const withinWindow =
+      typeof current?.windowStartedAt === "number" &&
+      now - current.windowStartedAt < 60_000;
+    const count = withinWindow && typeof current?.count === "number" ?
+      current.count : 0;
+
+    if (count >= 10) return false;
+
+    transaction.set(rateLimitRef, {
+      windowStartedAt: withinWindow ? current!.windowStartedAt : now,
+      count: count + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+/**
+ * Looks up a player account without returning its email to the caller.
+ * @param {string} playerId - The public Player ID.
+ * @return {Promise<{uid: string; email: string} | null>} Private account data.
+ */
+async function getApprovedPlayerAccount(
+  playerId: string,
+): Promise<{uid: string; email: string} | null> {
+  const idSnapshot = await db.collection("playerIds").doc(playerId).get();
+  const registrationId = idSnapshot.data()?.registrationId;
+  if (!idSnapshot.exists || typeof registrationId !== "string") return null;
+
+  const registrationSnapshot = await db.collection("registrations")
+    .doc(registrationId).get();
+  const registration = registrationSnapshot.data();
+  if (
+    !registrationSnapshot.exists ||
+    registration?.status !== "approved" ||
+    registration?.playerId !== playerId
+  ) return null;
+
+  const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
+  const playerSnapshot = await db.collection("players").doc(uid).get();
+  const email = playerSnapshot.data()?.email;
+  if (
+    !playerSnapshot.exists ||
+    playerSnapshot.data()?.status !== "approved" ||
+    typeof email !== "string" ||
+    !emailPattern.test(email)
+  ) return null;
+
+  return {uid, email: email.toLowerCase()};
+}
+
 export const submitRegistration = onRequest(
   {
     maxInstances: 3,
@@ -262,11 +327,43 @@ export const submitRegistration = onRequest(
         return;
       }
 
-      await db.collection("registrations").add({
-        ...validation.value,
-        createdAt: FieldValue.serverTimestamp(),
-        status: "new",
+      const emailHash = createHash("sha256")
+        .update(validation.value.email)
+        .digest("hex");
+      const emailIndexRef = db.collection("_registrationEmails").doc(emailHash);
+      const registrationRef = db.collection("registrations").doc();
+      const isDuplicate = await db.runTransaction(async (transaction) => {
+        const [emailIndex, existingRegistration] = await Promise.all([
+          transaction.get(emailIndexRef),
+          transaction.get(
+            db.collection("registrations")
+              .where("email", "==", validation.value.email)
+              .limit(1),
+          ),
+        ]);
+
+        if (emailIndex.exists || !existingRegistration.empty) {
+          return true;
+        }
+
+        transaction.create(registrationRef, {
+          ...validation.value,
+          createdAt: FieldValue.serverTimestamp(),
+          status: "new",
+        });
+        transaction.create(emailIndexRef, {
+          registrationId: registrationRef.id,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        return false;
       });
+
+      if (isDuplicate) {
+        response.status(409).json({
+          error: "This email address has already been used to submit an application.",
+        });
+        return;
+      }
 
       response.status(201).json({ok: true});
     } catch (error) {
@@ -339,79 +436,113 @@ export const updateRegistrationStatus = onCall(
 
 
 /**
- * Resolves a Player ID to its Firebase Authentication email for password-based sign-in.
- * The email is returned only after the ID maps to an approved registration and player record.
+ * Authenticates a player using their Player ID and password.
+ * The email lookup and password verification remain entirely on the server.
+ * The client receives only a Firebase custom token after successful verification.
  */
-export const resolvePlayerLogin = onCall(async (request) => {
-  const data = request.data as {playerId?: unknown};
+export const signInPlayer = onCall(async (request) => {
+  const data = request.data as {playerId?: unknown; password?: unknown};
   const playerId = typeof data?.playerId === "string" ?
     data.playerId.trim().toUpperCase() : "";
+  const password = typeof data?.password === "string" ? data.password : "";
 
-  if (!/^IGS-[A-Z0-9]{6}$/.test(playerId)) {
-    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  if (!/^IGS-[A-Z0-9]{6}$/.test(playerId) || password.length < 1 || password.length > 4096) {
+    throw new HttpsError("unauthenticated", "Player ID or password is incorrect.");
   }
 
-  // Limit ID lookups to make automated Player ID enumeration impractical.
-  const ip = request.rawRequest.ip || "unknown";
-  const ipHash = createHash("sha256").update(ip).digest("hex");
-  const rateLimitRef = db.collection("_playerLoginRateLimits").doc(ipHash);
-  const now = Date.now();
-  const allowed = await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(rateLimitRef);
-    const current = snapshot.data();
-    const withinWindow =
-      typeof current?.windowStartedAt === "number" &&
-      now - current.windowStartedAt < 60_000;
-    const count = withinWindow && typeof current?.count === "number" ?
-      current.count : 0;
-
-    if (count >= 10) return false;
-
-    transaction.set(rateLimitRef, {
-      windowStartedAt: withinWindow ? current!.windowStartedAt : now,
-      count: count + 1,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    return true;
-  });
-
+  const allowed = await consumePlayerLoginAttempt(request.rawRequest.ip || "unknown");
   if (!allowed) {
     throw new HttpsError("resource-exhausted", "Too many sign-in attempts. Please wait and try again.");
   }
 
-  const idSnapshot = await db.collection("playerIds").doc(playerId).get();
-  const registrationId = idSnapshot.data()?.registrationId;
-  if (!idSnapshot.exists || typeof registrationId !== "string") {
-    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  const account = await getApprovedPlayerAccount(playerId);
+  if (!account) {
+    throw new HttpsError("unauthenticated", "Player ID or password is incorrect.");
   }
 
-  const registrationRef = db.collection("registrations").doc(registrationId);
-  const registrationSnapshot = await registrationRef.get();
-  const registration = registrationSnapshot.data();
-  if (
-    !registrationSnapshot.exists ||
-    registration?.status !== "approved" ||
-    registration?.playerId !== playerId
-  ) {
-    throw new HttpsError("not-found", "Player ID or password is incorrect.");
+  try {
+    const authResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseWebApiKey.value()}`,
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          email: account.email,
+          password,
+          returnSecureToken: true,
+        }),
+      },
+    );
+    if (!authResponse.ok) {
+      throw new Error("Firebase Authentication rejected the credentials.");
+    }
+
+    const authResult = await authResponse.json() as {localId?: string};
+    if (authResult.localId !== account.uid) {
+      throw new Error("The authenticated account did not match the player record.");
+    }
+
+    const customToken = await getAuth().createCustomToken(account.uid);
+    return {customToken};
+  } catch (error) {
+    logger.warn("Player sign-in was not completed.", {
+      playerId,
+      reason: error instanceof Error ? error.message : "Unknown authentication error",
+    });
+    throw new HttpsError("unauthenticated", "Player ID or password is incorrect.");
   }
-
-  const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
-  const playerSnapshot = await db.collection("players").doc(uid).get();
-  const email = playerSnapshot.data()?.email;
-
-  if (
-    !playerSnapshot.exists ||
-    playerSnapshot.data()?.status !== "approved" ||
-    typeof email !== "string" ||
-    !emailPattern.test(email)
-  ) {
-    throw new HttpsError("not-found", "Player ID or password is incorrect.");
-  }
-
-  return {email: email.toLowerCase()};
 });
 
+/**
+ * Sends a password-reset email without disclosing whether a Player ID exists.
+ * The account email and reset link never leave the backend.
+ */
+export const requestPlayerPasswordReset = onCall(
+  {secrets: [smtpUser, smtpAppPassword]},
+  async (request) => {
+    const data = request.data as {playerId?: unknown};
+    const playerId = typeof data?.playerId === "string" ?
+      data.playerId.trim().toUpperCase() : "";
+
+    if (!/^IGS-[A-Z0-9]{6}$/.test(playerId)) return {ok: true};
+
+    const allowed = await consumePlayerLoginAttempt(request.rawRequest.ip || "unknown");
+    if (!allowed) {
+      throw new HttpsError("resource-exhausted", "Too many attempts. Please wait and try again.");
+    }
+
+    const account = await getApprovedPlayerAccount(playerId);
+    if (!account) return {ok: true};
+
+    try {
+      const passwordResetLink = await getAuth().generatePasswordResetLink(
+        account.email,
+        {url: "https://immersive-games.com/#/player", handleCodeInApp: false},
+      );
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: {user: smtpUser.value(), pass: smtpAppPassword.value()},
+      });
+      await transporter.sendMail({
+        from: `Immersive Games Studio <${smtpUser.value()}>`,
+        to: account.email,
+        subject: "Reset Your Player Portal Password",
+        text: `Use the following link to reset your Player Portal password:\n\n${passwordResetLink}\n\nIf you did not request this, you can ignore this email.\n\nImmersive Games Studio`,
+        html: `<p>Use the link below to reset your Player Portal password:</p><p><a href="${passwordResetLink.replace(/&/g, "&amp;")}">Reset your password</a></p><p>If you did not request this, you can ignore this email.</p><p>Immersive Games Studio</p>`,
+      });
+    } catch (error) {
+      logger.error("Player password reset email could not be sent.", {
+        playerId,
+        error,
+      });
+      // Keep the public response identical for valid and invalid Player IDs.
+    }
+
+    return {ok: true};
+  },
+);
 
 /**
  * Approves an applicant, creates its player account, and emails the password setup link.

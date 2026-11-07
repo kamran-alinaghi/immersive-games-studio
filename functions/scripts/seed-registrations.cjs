@@ -8,7 +8,7 @@ const {
   Timestamp,
 } = require("firebase-admin/firestore");
 
-const PROJECT_ID = "immersive-game-studio";
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "immersive-game-studio";
 
 // Refuse to run unless the Firestore emulator is explicitly configured.
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
@@ -22,10 +22,8 @@ initializeApp({ projectId: PROJECT_ID });
 
 const db = getFirestore();
 
-const jsonPath = path.resolve(
-  __dirname,
-  "../../seed-registrations.json"
-);
+const registrationsFile = process.env.SEED_REGISTRATIONS_FILE || "seed-registrations.json";
+const jsonPath = path.resolve(process.cwd(), registrationsFile);
 
 async function seedRegistrations() {
   const registrations = JSON.parse(

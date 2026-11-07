@@ -5,7 +5,7 @@ const {
   FieldValue,
 } = require("firebase-admin/firestore");
 
-const PROJECT_ID = "immersive-game-studio";
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "immersive-game-studio";
 
 // Safety: never allow this script to run against production.
 const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;

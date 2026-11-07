@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   onAuthStateChanged,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -18,10 +17,15 @@ type PlayerProfile = {
   status?: string;
 };
 
-const resolvePlayerLogin = httpsCallable<
+const signInPlayer = httpsCallable<
+  { playerId: string; password: string },
+  { customToken: string }
+>(functions, 'signInPlayer');
+
+const requestPlayerPasswordReset = httpsCallable<
   { playerId: string },
-  { email: string }
->(functions, 'resolvePlayerLogin');
+  { ok: boolean }
+>(functions, 'requestPlayerPasswordReset');
 
 function PlayerPortal() {
   const [user, setUser] = useState<User | null>(null);
@@ -65,13 +69,14 @@ function PlayerPortal() {
     setError('');
     setMessage('');
     try {
-      const result = await resolvePlayerLogin({
+      const result = await signInPlayer({
         playerId: playerId.trim().toUpperCase(),
+        password,
       });
-      await signInWithEmailAndPassword(auth, result.data.email, password);
+      await signInWithCustomToken(auth, result.data.customToken);
       setPassword('');
     } catch {
-      setError('Sign-in failed. Check your email and password, or use the password reset option.');
+      setError('Sign-in failed. Check your Player ID and password, or use the password reset option.');
     } finally {
       setBusy(false);
     }
@@ -86,15 +91,12 @@ function PlayerPortal() {
     setError('');
     setMessage('');
     try {
-      const result = await resolvePlayerLogin({
+      await requestPlayerPasswordReset({
         playerId: playerId.trim().toUpperCase(),
-      });
-      await sendPasswordResetEmail(auth, result.data.email, {
-        url: 'https://immersive-games.com/#/player',
       });
       setMessage('If the Player ID is valid, a password reset link will be sent to the email address registered to that account.');
     } catch {
-      setError('We could not send a password reset email. Please check the address and try again.');
+      setError('We could not send a password reset email. Please try again later.');
     } finally {
       setBusy(false);
     }

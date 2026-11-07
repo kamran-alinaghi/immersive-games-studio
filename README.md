@@ -85,3 +85,18 @@ The administrator interface is available at `#/admin`. It uses Firebase Authenti
 Open `https://your-domain/#/admin` to sign in. The initial implementation supports applicant listing, search, status filtering, viewing questionnaire fields, and backend-authorized status updates. Supported statuses are `new`, `under_review`, `approved`, `rejected`, and `contacted`.
 
 **Important:** Approval currently changes the application status only. It does not yet create a player account, assign a player ID, or send an approval email; those belong to the next milestone. The dashboard assumes the existing registration documents contain `createdAt`, `fullName`, and `email` fields. Records missing `createdAt` may not appear in the ordered query until normalized.
+
+
+## Local emulator seed data
+
+The seed command loads its settings from the root-level `.env.seed` file. Copy `.env.seed.example` to `.env.seed`, set a local administrator email and a strong local-only password, and confirm the Auth and Firestore emulator hosts point to localhost. The command refuses to run unless both emulators are configured on the expected local ports.
+
+```bash
+npm run seed
+```
+
+The registration data file is selected with `SEED_REGISTRATIONS_FILE` (relative to the repository root, unless an absolute path is supplied). Seed scripts are for local emulator data only; never use production credentials or real participant data in this file.
+
+## Player portal sign-in
+
+Players sign in with their Player ID and password. The backend resolves the Player ID to the account email privately, verifies the password with Firebase Authentication, and returns a Firebase custom token. The account email is never returned by a Player ID lookup. The Functions parameter `FIREBASE_WEB_API_KEY` must be set to the Firebase project's public Web API key when deploying Functions. It is a public Firebase client configuration value, not a service-account credential.
