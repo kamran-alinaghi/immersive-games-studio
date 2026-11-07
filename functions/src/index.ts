@@ -14,7 +14,7 @@ if (getApps().length === 0) {
 const db = getFirestore();
 const smtpUser = defineSecret("SMTP_USER");
 const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
-const firebaseWebApiKey = defineString("FIREBASE_WEB_API_KEY");
+const webApiKey  = defineString("WEB_API_KEY");
 
 setGlobalOptions({maxInstances: 3});
 
@@ -238,9 +238,11 @@ async function consumePlayerLoginAttempt(ip: string): Promise<boolean> {
 }
 
 /**
- * Looks up a player account without returning its email to the caller.
- * @param {string} playerId - The public Player ID.
- * @return {Promise<{uid: string; email: string} | null>} Private account data.
+ * Applies a per-IP limit to player sign-in and password-reset attempts.
+ *
+ * @param {string} playerId - The player ID.
+ * @param {string} ip - The request IP address.
+ * @return {Promise<boolean>} Whether the request is within the limit.
  */
 async function getApprovedPlayerAccount(
   playerId: string,
@@ -464,7 +466,7 @@ export const signInPlayer = onCall(async (request) => {
     const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
     const authUrl = authHost ?
       `http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key` :
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseWebApiKey.value()}`;
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${webApiKey .value()}`;
     const authResponse = await fetch(
       authUrl,
       {
