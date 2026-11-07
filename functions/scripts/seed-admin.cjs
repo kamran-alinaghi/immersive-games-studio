@@ -21,8 +21,10 @@ if (
   process.exit(1);
 }
 
-const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-const password = process.env.ADMIN_PASSWORD;
+//const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+const email = "admin@gmail.com"
+//const password = process.env.ADMIN_PASSWORD;
+const password = "012345678912"
 const displayName = process.env.ADMIN_NAME || "Local Administrator";
 
 if (!email || !password || password.length < 12) {

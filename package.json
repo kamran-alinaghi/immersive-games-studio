@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "seed": "node functions/scripts/seed-admin.cjs && node functions/scripts/seed-registrations.cjs"
+    "seed": "node -e \"process.env.FIREBASE_AUTH_EMULATOR_HOST='127.0.0.1:9099'; process.env.FIRESTORE_EMULATOR_HOST='127.0.0.1:8081'; process.argv=['node','seed-admin']; require('./functions/scripts/seed-admin.cjs'); require('./functions/scripts/seed-registrations.cjs')\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
