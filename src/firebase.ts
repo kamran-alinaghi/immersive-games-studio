@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getStorage } from 'firebase/storage';
+import { connectStorageEmulator, getStorage } from 'firebase/storage';
 import { connectAuthEmulator, getAuth} from 'firebase/auth';
 import {
   connectFirestoreEmulator,
@@ -15,6 +15,7 @@ const config = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
 };
 
 const missing = Object.entries(config)
@@ -40,6 +41,7 @@ if (import.meta.env.DEV) {
   connectFirestoreEmulator(db, '127.0.0.1', 8081);
   connectFunctionsEmulator(functions, '127.0.0.1', 8080);
   connectAuthEmulator(auth, "http://127.0.0.1:9099");
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
   console.info(
     '[Firebase] Using local Firestore (127.0.0.1:8081) and ' +
       'Functions (127.0.0.1:8080) emulators.',
