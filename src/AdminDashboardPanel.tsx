@@ -5,7 +5,7 @@ import { getDownloadURL, ref } from 'firebase/storage';
 import { db, functions, storage } from './firebase';
 
 type Row={id:string;[key:string]:any};
-const call=<I,O>(name:string)=>httpsCallable<I,O>(functions,name);
+const call = <I, O,>(name: string) => httpsCallable<I, O>(functions, name);
 const createQuest=call<any,any>('createQuest'),assignQuest=call<any,any>('assignQuest'),updateQuest=call<any,any>('updateQuest'),reviewQuest=call<any,any>('reviewQuestSubmission');
 const createTeam=call<any,any>('createTeam'),assignPlayer=call<any,any>('assignPlayerToTeam'),toggleTeam=call<any,any>('setTeamSuggestionsOpen'),reviewSuggestion=call<any,any>('reviewTeamSuggestion');
 function AdminDashboardPanel(){
