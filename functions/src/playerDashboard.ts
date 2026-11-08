@@ -190,7 +190,7 @@ export const suggestTeammate = onCall(async (request) => {
   const targetId = await db.collection("playerIds").doc(targetPlayerId).get();
   const registrationId = targetId.data()?.registrationId;
   if (!targetId.exists || typeof registrationId !== "string") throw new HttpsError("not-found","The player could not be found.");
-  const uid = "player_" + (await import("node:crypto")).createHash("sha256").update(registrationId).digest("hex").slice(0,40);
+  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0,40);
   if (uid === request.auth!.uid) throw new HttpsError("invalid-argument","You cannot suggest yourself.");
   const target = await db.collection("players").doc(uid).get();
   if (!target.exists || target.data()?.status !== "approved" || target.data()?.teamId) throw new HttpsError("failed-precondition","This player is not eligible to join a team.");
