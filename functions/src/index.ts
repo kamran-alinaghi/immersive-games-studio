@@ -699,3 +699,19 @@ Immersive Games Studio`;
     }
   },
 );
+
+
+// Player dashboard quest and team-management workflows.
+export {
+  createQuest,
+  updateQuest,
+  assignQuest,
+  recordQuestSubmission,
+  reviewQuestSubmission,
+  createTeam,
+  setTeamSuggestionsOpen,
+  assignPlayerToTeam,
+  suggestTeammate,
+  reviewTeamSuggestion,
+  respondToTeamSuggestion,
+} from "./playerDashboard.js";
