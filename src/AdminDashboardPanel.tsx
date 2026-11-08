@@ -20,7 +20,7 @@ function AdminDashboardPanel(){
  const onAssign=async(e:FormEvent)=>{e.preventDefault();await run(()=>assignQuest({questId,playerId}), 'Quest assigned.');};
  const onCreateTeam=async(e:FormEvent)=>{e.preventDefault();await run(async()=>{const r=await createTeam({name:teamName});setTeamName('');return r;},'Team created.');};
  const onAssignPlayer=async(e:FormEvent)=>{e.preventDefault();await run(()=>assignPlayer({teamId,playerId}), 'Player assigned to team.');};
- const fileLink=async(path:string)=>{try{window.open(await getDownloadURL(ref(storage,path)),'_blank','noopener');}catch{setError('Could not open evidence file.');}};
+ const fileLink=async(path:string)=>{try{window.location.assign(await getDownloadURL(ref(storage,path)));}catch{setError('Could not open evidence file.');}};
  return <section className="admin-content dashboard-admin"><div className="admin-heading"><div><p className="admin-eyebrow">PLAYER MANAGEMENT</p><h1>Quests & Teams</h1><p className="admin-muted">Create individual quests, review evidence, and manage team membership.</p></div><button className="admin-quiet" onClick={()=>void load()}>Refresh</button></div>
  {error&&<p className="admin-error" role="alert">{error}</p>}{notice&&<p className="admin-success" role="status">{notice}</p>}
  <nav className="dashboard-tabs">{(['quests','submissions','teams','suggestions'] as const).map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x==='quests'?'Quests':x==='submissions'?'Submissions':x==='teams'?'Teams':'Team suggestions'}</button>)}</nav>
