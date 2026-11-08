@@ -329,7 +329,7 @@ export const notifyOnTeamMembershipUpdated = onDocumentUpdated(
 
     const oldMembers = Array.isArray(before.memberUids) ? before.memberUids : [];
     const newMembers = Array.isArray(after.memberUids) ? after.memberUids : [];
-    const addedMembers = newMembers.filter((uid: unknown) =>
+    const addedMembers = newMembers.filter((uid: unknown): uid is string =>
       typeof uid === "string" && !oldMembers.includes(uid));
     if (!addedMembers.length) return;
 
@@ -427,13 +427,6 @@ export const notifyOnTeamSuggestionUpdated = onDocumentUpdated(
         subject: "Your Team Invitation Was Declined",
         heading: "Invitation declined",
         message: "The player you invited has declined the team invitation.",
-        details: teamName,
-      });
-    } else if (playerA && after.status === "accepted") {
-      await sendPlayerEmail(playerA, event.id, {
-        subject: "Your Teammate Invitation Was Accepted",
-        heading: "Invitation accepted",
-        message: "The player you suggested has accepted the invitation and joined your team.",
         details: teamName,
       });
     }
