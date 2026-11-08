@@ -225,6 +225,7 @@ export const reviewTeamSuggestion = onCall(async (request) => {
 });
 
 export const respondToTeamSuggestion = onCall(async (request) => {
+  await requirePlayer(request.auth?.uid);
   const decision = clean(request.data?.decision,20);
   const suggestionId = clean(request.data?.suggestionId,150);
   if (!suggestionId || !["accept","decline"].includes(decision)) throw new HttpsError("invalid-argument","Invalid response.");
