@@ -1,3 +1,4 @@
+/* eslint-disable max-len, require-jsdoc, @typescript-eslint/no-explicit-any */
 import {createHash} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
