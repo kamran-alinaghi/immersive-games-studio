@@ -13,7 +13,9 @@ service firebase.storage {
         && request.auth.uid == uid
         && request.resource != null
         && request.resource.size > 0
-        && request.resource.size <= 262144000
+        && request.resource.size <= 52428800
+        && firestore.exists(/databases/(default)/documents/questAssignments/$(assignmentId))
+        && firestore.get(/databases/(default)/documents/questAssignments/$(assignmentId)).data.playerUid == uid
         && request.resource.contentType.matches('(image/(jpeg|png|webp)|video/(mp4|quicktime|webm)|application/pdf|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document)');
       allow delete: if signedIn() && (request.auth.uid == uid || isActiveAdmin());
     }
