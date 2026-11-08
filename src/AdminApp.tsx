@@ -6,6 +6,7 @@ import { httpsCallable } from 'firebase/functions';
 import { ArrowLeft, LogOut, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import { auth, db, functions } from './firebase';
 import './admin.css';
+import AdminDashboardPanel from './AdminDashboardPanel';
 
 type Status = 'new' | 'under_review' | 'approved' | 'rejected' | 'contacted';
 type Applicant = DocumentData & { id: string; fullName?: string; email?: string; status?: Status; createdAt?: { toDate?: () => Date } };
@@ -16,6 +17,7 @@ const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean
 
 function AdminApp() {
   const [user, setUser] = useState<User | null>(null);
+  const [view, setView] = useState<'applications' | 'dashboard'>('applications');
   const [authReady, setAuthReady] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -106,10 +108,15 @@ function AdminApp() {
     </form>
   </section></main>;
 
+  if (view === 'dashboard') return <main className="admin-page">
+    <header className="admin-header"><a href="#top" className="admin-brand">IMMERSIVE GAMES <em>STUDIO</em></a><div><button className="admin-quiet" onClick={() => setView('applications')}>Applications</button><span>{user.email}</span><button className="admin-quiet" onClick={() => void signOut(auth)}><LogOut size={15}/> Sign out</button></div></header>
+    <AdminDashboardPanel />
+  </main>;
+
   const counts = statuses.reduce((acc, status) => ({ ...acc, [status]: applicants.filter(item => (item.status ?? 'new') === status).length }), {} as Record<Status, number>);
   const formatDate = (value: Applicant['createdAt']) => value?.toDate ? value.toDate().toLocaleString() : '—';
   return <main className="admin-page">
-    <header className="admin-header"><a href="#top" className="admin-brand">IMMERSIVE GAMES <em>STUDIO</em></a><div><span>{user.email}</span><button className="admin-quiet" onClick={() => signOut(auth)}><LogOut size={15}/> Sign out</button></div></header>
+    <header className="admin-header"><a href="#top" className="admin-brand">IMMERSIVE GAMES <em>STUDIO</em></a><div><button className="admin-quiet" onClick={() => setView("dashboard")}>Quests &amp; Teams</button><span>{user.email}</span><button className="admin-quiet" onClick={() => signOut(auth)}><LogOut size={15}/> Sign out</button></div></header>
     <section className="admin-content">
       <div className="admin-heading"><div><p className="admin-eyebrow">ADMINISTRATION</p><h1>Applications</h1><p className="admin-muted">Review and manage registration submissions.</p></div><button className="admin-quiet" onClick={() => void loadApplicants()} disabled={loading}><RefreshCw size={15}/> Refresh</button></div>
       <div className="admin-stats">{statuses.map(status => <button key={status} className={filter === status ? 'admin-stat active' : 'admin-stat'} onClick={() => setFilter(filter === status ? 'all' : status)}><strong>{counts[status]}</strong><span>{labels[status]}</span></button>)}</div>
