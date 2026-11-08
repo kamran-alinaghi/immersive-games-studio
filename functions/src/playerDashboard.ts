@@ -34,7 +34,7 @@ export const createQuest = onCall(async (request) => {
   if (!title || !description || !Array.isArray(allowedTypes) || !allowedTypes.length ||
       !allowedTypes.every((x: unknown) => ["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm","application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(String(x))) ||
       !Number.isInteger(maxFiles) || maxFiles < 1 || maxFiles > 20 ||
-      !Number.isInteger(maxFileSizeBytes) || maxFileSizeBytes < 1 || maxFileSizeBytes > 250 * 1024 * 1024) {
+      !Number.isInteger(maxFileSizeBytes) || maxFileSizeBytes < 1 || maxFileSizeBytes > 50 * 1024 * 1024) {
     throw new HttpsError("invalid-argument", "Enter a title, description, allowed file types, and valid upload limits.");
   }
   const ref = await db.collection("quests").add({
@@ -88,7 +88,7 @@ export const recordQuestSubmission = onCall(async (request) => {
   const ref = db.collection("questAssignments").doc(assignmentId);
   const assignment = await ref.get();
   if (!assignment.exists || assignment.data()?.playerUid !== request.auth!.uid) throw new HttpsError("not-found","Quest assignment not found.");
-  if (["approved","under_review"].includes(String(assignment.data()?.status))) throw new HttpsError("failed-precondition","This submission is already under review or approved.");
+  if (!["not_started","revision_required"].includes(String(assignment.data()?.status))) throw new HttpsError("failed-precondition","This quest is not currently accepting evidence.");
   const quest = await db.collection("quests").doc(String(assignment.data()?.questId)).get();
   const allowed = quest.data()?.allowedTypes as string[] | undefined;
   const maxFiles = Number(quest.data()?.maxFiles ?? 5);
