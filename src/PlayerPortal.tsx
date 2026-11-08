@@ -3,12 +3,12 @@ import { onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword,
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { ArrowLeft, CheckCircle2, Clock3, FileText, Image, LogOut, ShieldCheck, Upload, Users, Video } from 'lucide-react';
+import { ArrowLeft, FileText, LogOut, ShieldCheck, Upload, Users } from 'lucide-react';
 import { auth, db, functions, storage } from './firebase';
 import './admin.css';
 
 type PlayerProfile = { fullName?: string; email?: string; playerId?: string; status?: string; teamId?: string; teamName?: string };
-type Quest = { id: string; questId: string; questTitle?: string; status: string; files?: {name:string;path:string;contentType:string;size:number}[]; feedback?:string; };
+type Quest = { id: string; questId: string; questTitle?: string; questDescription?: string; status: string; files?: {name:string;path:string;contentType:string;size:number}[]; feedback?:string; };
 type Team = { id:string; name:string; memberUids?:string[]; memberPlayerIds?:string[]; suggestionsOpen?:boolean };
 type Suggestion = { id:string; teamName?:string; suggestedByPlayerId?:string; status:string };
 const resolvePlayerLogin = httpsCallable<{playerId:string},{email:string}>(functions,'resolvePlayerLogin');
@@ -77,7 +77,7 @@ function PlayerPortal() {
       {suggestions.length>0&&<section className="dashboard-panel"><h2>Team requests</h2>{suggestions.map(s=><article className="dashboard-card" key={s.id}><strong>Invitation to join {s.teamName??'a team'}</strong><p>Suggested by {s.suggestedByPlayerId??'a player'} and approved by administration.</p><div className="dashboard-actions"><button className="admin-primary" onClick={()=>void respond(s.id,'accept')} disabled={busy}>Accept</button><button className="admin-secondary" onClick={()=>void respond(s.id,'decline')} disabled={busy}>Decline</button></div></article>)}</section>}
       <div className="dashboard-grid"><section className="dashboard-panel"><div className="dashboard-section-head"><div><p className="admin-eyebrow">YOUR ASSIGNMENTS</p><h2>Quests</h2></div><span className="dashboard-count">{counts.approved}/{counts.total} approved</span></div>
         {quests.length===0&&<p className="admin-muted">No quests have been assigned to you yet.</p>}
-        {quests.map(q=><article className="dashboard-card" key={q.id}><div className="dashboard-card-head"><h3>{q.questTitle??'Quest'}</h3><span className={'admin-badge '+(q.status==='approved'?'approved':q.status==='revision_required'?'rejected':'')}>{statusLabels[q.status]??q.status}</span></div><p className="admin-muted">{q.status==='approved'?'This quest has been approved.':q.status==='under_review'?'Your submission is being reviewed.':q.status==='revision_required'?'Please review the coordinator feedback and submit additional evidence.':q.status==='submitted'?'Your evidence has been submitted and is waiting for review.':'Upload your evidence to complete this quest.'}</p>
+        {quests.map(q=><article className="dashboard-card" key={q.id}><div className="dashboard-card-head"><h3>{q.questTitle??'Quest'}</h3><span className={'admin-badge '+(q.status==='approved'?'approved':q.status==='revision_required'?'rejected':'')}>{statusLabels[q.status]??q.status}</span></div><p className="dashboard-quest-description">{q.questDescription}</p><p className="admin-muted">{q.status==='approved'?'This quest has been approved.':q.status==='under_review'?'Your submission is being reviewed.':q.status==='revision_required'?'Please review the coordinator feedback and submit additional evidence.':q.status==='submitted'?'Your evidence has been submitted and is waiting for review.':'Upload your evidence to complete this quest.'}</p>
           {q.feedback&&<p className="dashboard-feedback"><strong>Coordinator feedback:</strong> {q.feedback}</p>}
           {q.files?.map((f,i)=><a className="dashboard-file" key={f.path+i} href="#" onClick={async e=>{e.preventDefault();try{window.open(await getDownloadURL(ref(storage,f.path)),'_blank','noopener');}catch{setError('Unable to open this file.');}}}><FileText size={15}/>{f.name}</a>)}
           {q.status!=='approved'&&<div className="dashboard-upload"><label>Evidence files<input type="file" multiple accept={allowedExtensions} onChange={e=>setFiles(current=>({...current,[q.id]:Array.from(e.target.files??[])}))}/></label>{files[q.id]?.length>0&&<small>{files[q.id].length} file(s) selected</small>}<button className="admin-primary" onClick={()=>void upload(q)} disabled={uploading===q.id||!(files[q.id]?.length)}><Upload size={15}/>{uploading===q.id?'Uploading…':'Upload evidence'}</button></div>}
