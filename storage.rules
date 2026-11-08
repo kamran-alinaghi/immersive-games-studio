@@ -19,6 +19,18 @@ service firebase.storage {
         && request.resource.contentType.matches('(image/(jpeg|png|webp)|video/(mp4|quicktime|webm)|application/pdf|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document)');
       allow delete: if signedIn() && (request.auth.uid == uid || isActiveAdmin());
     }
+    // Preserve the existing player video-upload path and access pattern.
+    match /players/{uid}/videos/{videoPath=**} {
+      allow read: if signedIn() && (request.auth.uid == uid || isActiveAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 262144000
+        && request.resource.contentType in ['video/mp4','video/quicktime','video/webm'];
+      allow update: if isActiveAdmin();
+      allow delete: if signedIn() && (request.auth.uid == uid || isActiveAdmin());
+    }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }
