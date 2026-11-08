@@ -1,4 +1,5 @@
-import {createHash} from "node:crypto";\nimport {getApps, initializeApp} from "firebase-admin/app";
+import {createHash} from "node:crypto";
+import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 
