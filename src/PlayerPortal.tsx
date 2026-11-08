@@ -9,7 +9,7 @@ import './admin.css';
 
 type PlayerProfile = { fullName?: string; email?: string; playerId?: string; status?: string; teamId?: string; teamName?: string };
 type Quest = { id: string; questId: string; questTitle?: string; questDescription?: string; status: string; files?: {name:string;path:string;contentType:string;size:number}[]; feedback?:string; };
-type Team = { id:string; name:string; memberUids?:string[]; memberPlayerIds?:string[]; suggestionsOpen?:boolean };
+type Team = { id:string; name:string; memberUids?:string[]; memberPlayerIds?:string[]; memberNames?:string[]; suggestionsOpen?:boolean };
 type Suggestion = { id:string; teamName?:string; suggestedByPlayerId?:string; status:string };
 const resolvePlayerLogin = httpsCallable<{playerId:string},{email:string}>(functions,'resolvePlayerLogin');
 const recordSubmission = httpsCallable<{assignmentId:string;files:{name:string;path:string;contentType:string;size:number}[]}, {ok:boolean}>(functions,'recordQuestSubmission');
@@ -20,7 +20,7 @@ const allowedExtensions = '.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.pdf,.doc,.docx
 function PlayerPortal() {
   const [user,setUser]=useState<User|null>(null),[profile,setProfile]=useState<PlayerProfile|null>(null),[authReady,setAuthReady]=useState(false);
   const [playerId,setPlayerId]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
-  const [quests,setQuests]=useState<Quest[]>([]),[team,setTeam]=useState<Team|null>(null),[members,setMembers]=useState<PlayerProfile[]>([]),[suggestions,setSuggestions]=useState<Suggestion[]>([]);
+  const [quests,setQuests]=useState<Quest[]>([]),[team,setTeam]=useState<Team|null>(null),[suggestions,setSuggestions]=useState<Suggestion[]>([]);
   const [suggestedId,setSuggestedId]=useState(''),[uploading,setUploading]=useState(''),[files,setFiles]=useState<Record<string,File[]>>({});
   const [loading,setLoading]=useState(false);
   useEffect(()=>onAuthStateChanged(auth,current=>{setUser(current);setAuthReady(true);}),[]);
@@ -41,12 +41,12 @@ function PlayerPortal() {
           const td={id:t.id,...t.data()} as Team;setTeam(td);
           const memberDocs=await Promise.all((td.memberUids??[]).map(id=>getDoc(doc(db,'players',id))));
           setMembers(memberDocs.filter(x=>x.exists()).map(x=>x.data() as PlayerProfile));
-        }else{setTeam(null);setMembers([]);}
-      }else{setTeam(null);setMembers([]);}
+        }else{setTeam(null);}
+      }else{setTeam(null);}
     }catch(e){setError(e instanceof Error?e.message:'Unable to load your dashboard.');}
     finally{setLoading(false);}
   };
-  useEffect(()=>{if(user) void loadDashboard(user.uid);else{setProfile(null);setQuests([]);setTeam(null);setMembers([]);setSuggestions([]);}},[user]);
+  useEffect(()=>{if(user) void loadDashboard(user.uid);else{setProfile(null);setQuests([]);setTeam(null);setSuggestions([]);}},[user]);
   const login=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');setMessage('');try{const r=await resolvePlayerLogin({playerId:playerId.trim().toUpperCase()});const email=typeof r.data.email==='string'?r.data.email.trim():'';if(!email)throw new Error('Invalid player account.');await signInWithEmailAndPassword(auth,email,password);setPassword('');}catch{setError('Sign-in failed. Check your Player ID and password, or use password reset.');}finally{setBusy(false);}};
   const reset=async()=>{if(!playerId.trim()){setError('Enter your Player ID first.');return;}setBusy(true);setError('');try{const r=await resolvePlayerLogin({playerId:playerId.trim().toUpperCase()});if(!r.data.email)throw new Error();await sendPasswordResetEmail(auth,r.data.email,{url:'https://immersive-games.com/#/player'});setMessage('If the Player ID is valid, a password reset link will be sent to its registered email.');}catch{setError('We could not send a password reset email.');}finally{setBusy(false);}};
   const upload=async(quest:Quest)=>{
@@ -84,7 +84,7 @@ function PlayerPortal() {
         </article>)}
       </section><aside className="dashboard-panel"><div className="dashboard-section-head"><div><p className="admin-eyebrow">YOUR GROUP</p><h2><Users size={20}/> My Team</h2></div></div>
         {!team&&<p className="admin-muted">You have not been assigned to a team yet.</p>}
-        {team&&<><p className="dashboard-team-name">{team.name}</p><ul className="dashboard-members">{members.map(m=><li key={m.playerId}>{m.fullName??m.playerId} {m.playerId===profile?.playerId&&<span>(You)</span>}</li>)}</ul>{team.suggestionsOpen?<form className="dashboard-suggest" onSubmit={sendSuggestion}><label>Suggest a teammate<p className="admin-muted">Enter the Player ID of someone you know and would like to join your team.</p><input placeholder="IGS-XXXXXX" required value={suggestedId} onChange={e=>setSuggestedId(e.target.value.toUpperCase())}/></label><button className="admin-primary" disabled={busy||!suggestedId.trim()}>Submit suggestion</button></form>:<p className="admin-note">Team suggestions are currently closed.</p>}</>}
+        {team&&<><p className="dashboard-team-name">{team.name}</p><ul className="dashboard-members">{(team.memberPlayerIds??[]).map((id,index)=><li key={id}>{team.memberNames?.[index]??id} · {id} {id===profile?.playerId&&<span>(You)</span>}</li>)}</ul>{team.suggestionsOpen?<form className="dashboard-suggest" onSubmit={sendSuggestion}><label>Suggest a teammate<p className="admin-muted">Enter the Player ID of someone you know and would like to join your team.</p><input placeholder="IGS-XXXXXX" required value={suggestedId} onChange={e=>setSuggestedId(e.target.value.toUpperCase())}/></label><button className="admin-primary" disabled={busy||!suggestedId.trim()}>Submit suggestion</button></form>:<p className="admin-note">Team suggestions are currently closed.</p>}</>}
       </aside></div>
     </section></main>;
 }
