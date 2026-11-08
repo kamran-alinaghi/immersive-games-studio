@@ -1,4 +1,4 @@
-import {getApps, initializeApp} from "firebase-admin/app";
+import {createHash} from "node:crypto";\nimport {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 
@@ -67,13 +67,13 @@ export const assignQuest = onCall(async (request) => {
   if (!idDoc.exists || typeof registrationId !== "string") throw new HttpsError("not-found","Player not found.");
   const registration = await db.collection("registrations").doc(registrationId).get();
   if (!registration.exists || registration.data()?.status !== "approved") throw new HttpsError("failed-precondition","Player is not approved.");
-  const uid = "player_" + (await import("node:crypto")).createHash("sha256").update(registrationId).digest("hex").slice(0,40);
+  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0,40);
   const player = await db.collection("players").doc(uid).get();
   if (!player.exists || player.data()?.status !== "approved") throw new HttpsError("failed-precondition","Player account is not active.");
   const existing = await db.collection("questAssignments").where("playerUid","==",uid).where("questId","==",questId).limit(1).get();
   if (!existing.empty) return {ok:true, assignmentId:existing.docs[0].id, alreadyAssigned:true};
   const ref = await db.collection("questAssignments").add({
-    playerUid:uid, playerId, questId, questTitle:quest.data()?.title,
+    playerUid:uid, playerId, questId, questTitle:quest.data()?.title, questDescription:quest.data()?.description,
     status:"not_started", createdAt:FieldValue.serverTimestamp(), createdBy:request.auth!.uid,
   });
   return {ok:true, assignmentId:ref.id, alreadyAssigned:false};
