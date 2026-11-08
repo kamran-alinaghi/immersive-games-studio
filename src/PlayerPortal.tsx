@@ -39,8 +39,6 @@ function PlayerPortal() {
         const t=await getDoc(doc(db,'teams',data.teamId));
         if(t.exists()){
           const td={id:t.id,...t.data()} as Team;setTeam(td);
-          const memberDocs=await Promise.all((td.memberUids??[]).map(id=>getDoc(doc(db,'players',id))));
-          setMembers(memberDocs.filter(x=>x.exists()).map(x=>x.data() as PlayerProfile));
         }else{setTeam(null);}
       }else{setTeam(null);}
     }catch(e){setError(e instanceof Error?e.message:'Unable to load your dashboard.');}
