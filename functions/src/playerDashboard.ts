@@ -162,7 +162,7 @@ export const assignPlayerToTeam = onCall(async (request) => {
   if (!player.exists || player.data()?.status !== "approved") throw new HttpsError("failed-precondition","Player is not active.");
   if (player.data()?.teamId) throw new HttpsError("failed-precondition","Player already belongs to a team. Remove or transfer them explicitly first.");
   await db.runTransaction(async tx => {
-    tx.update(teamRef,{memberUids:FieldValue.arrayUnion(uid),memberPlayerIds:FieldValue.arrayUnion(playerId),updatedAt:FieldValue.serverTimestamp()});
+    tx.update(teamRef,{memberUids:FieldValue.arrayUnion(uid),memberPlayerIds:FieldValue.arrayUnion(playerId),memberNames:FieldValue.arrayUnion(player.data()?.fullName ?? playerId),updatedAt:FieldValue.serverTimestamp()});
     tx.update(playerRef,{teamId,teamName:team.data()?.name});
   });
   return {ok:true};
@@ -230,7 +230,7 @@ export const respondToTeamSuggestion = onCall(async (request) => {
     const playerRef = db.collection("players").doc(request.auth!.uid);
     const [team,player] = await Promise.all([tx.get(teamRef),tx.get(playerRef)]);
     if (!team.exists || team.data()?.suggestionsOpen !== true || player.data()?.teamId) throw new HttpsError("failed-precondition","The team is closed or you already belong to a team.");
-    tx.update(teamRef,{memberUids:FieldValue.arrayUnion(request.auth!.uid),memberPlayerIds:FieldValue.arrayUnion(data.suggestedPlayerId),updatedAt:FieldValue.serverTimestamp()});
+    tx.update(teamRef,{memberUids:FieldValue.arrayUnion(request.auth!.uid),memberPlayerIds:FieldValue.arrayUnion(data.suggestedPlayerId),memberNames:FieldValue.arrayUnion(player.data()?.fullName ?? data.suggestedPlayerId),updatedAt:FieldValue.serverTimestamp()});
     tx.update(playerRef,{teamId:data.teamId,teamName:team.data()?.name});
     tx.update(ref,{status:"accepted",respondedAt:FieldValue.serverTimestamp()});
   });
