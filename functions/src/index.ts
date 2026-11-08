@@ -247,7 +247,8 @@ export const submitRegistration = onRequest(
 
     const validation = validatePayload(body);
     if (!validation.ok) {
-      response.status(400).json({        error: "Please check your answers and try again.",
+      response.status(400).json({
+        error: "Please check your answers and try again.",
       });
       return;
     }
@@ -496,7 +497,8 @@ export const approveRegistration = onCall(
         throw new HttpsError("failed-precondition", "A rejected application cannot be approved.");
       }
 
-      if (current.status === "approved" && typeof current.playerId === "string") {        return {
+      if (current.status === "approved" && typeof current.playerId === "string") {
+        return {
           playerId: current.playerId,
           alreadyApproved: true,
           email,
