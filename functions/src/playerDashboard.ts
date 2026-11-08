@@ -142,7 +142,7 @@ export const createTeam = onCall(async (request) => {
   const name = clean(request.data?.name,80);
   if (!name) throw new HttpsError("invalid-argument","Team name is required.");
   const ref = await db.collection("teams").add({
-    name, memberUids:[], memberPlayerIds:[], suggestionsOpen:true,
+    name, memberUids:[], memberPlayerIds:[], memberNames:[], suggestionsOpen:true,
     createdAt:FieldValue.serverTimestamp(), createdBy:request.auth!.uid,
   });
   return {ok:true, teamId:ref.id};
@@ -167,7 +167,7 @@ export const assignPlayerToTeam = onCall(async (request) => {
   const idDoc = await db.collection("playerIds").doc(playerId).get();
   const registrationId = idDoc.data()?.registrationId;
   if (!idDoc.exists || typeof registrationId !== "string") throw new HttpsError("not-found","Player not found.");
-  const uid = "player_" + (await import("node:crypto")).createHash("sha256").update(registrationId).digest("hex").slice(0,40);
+  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0,40);
   const playerRef = db.collection("players").doc(uid);
   const player = await playerRef.get();
   if (!player.exists || player.data()?.status !== "approved") throw new HttpsError("failed-precondition","Player is not active.");
