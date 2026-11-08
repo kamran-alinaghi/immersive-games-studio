@@ -2,6 +2,7 @@
 import {createHash} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
+import {getStorage} from "firebase-admin/storage";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 
 if (getApps().length === 0) initializeApp();
@@ -99,6 +100,15 @@ export const recordQuestSubmission = onCall(async (request) => {
     typeof f.contentType === "string" && allowed?.includes(f.contentType) &&
     Number.isInteger(f.size) && f.size > 0 && f.size <= maxSize);
   if (!valid || files.length > maxFiles) throw new HttpsError("invalid-argument","One or more files do not meet this quest's upload requirements.");
+  const bucket = getStorage().bucket();
+  const verifiedFiles = await Promise.all(files.map(async (file: any) => {
+    const storedFile = bucket.file(file.path);
+    const [exists] = await storedFile.exists();
+    if (!exists) return false;
+    const [metadata] = await storedFile.getMetadata();
+    return Number(metadata.size) === file.size && metadata.contentType === file.contentType;
+  }));
+  if (!verifiedFiles.every(Boolean)) throw new HttpsError("failed-precondition","One or more uploaded files could not be verified.");
   const existingFiles = Array.isArray(assignment.data()?.files) ? assignment.data()!.files : [];
   const merged = [...existingFiles, ...files.map((f: any) => ({name:f.name, path:f.path, contentType:f.contentType, size:f.size}))];
   if (merged.length > maxFiles) throw new HttpsError("resource-exhausted","This quest's maximum file count has been reached.");
