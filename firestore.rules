@@ -21,7 +21,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
     match /quests/{questId} {
-      allow get, list: if signedIn();
+      allow get, list: if isActiveAdmin();
       allow write: if false;
     }
     match /questAssignments/{assignmentId} {
