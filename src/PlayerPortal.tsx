@@ -51,6 +51,9 @@ function PlayerPortal() {
   const reset=async()=>{if(!playerId.trim()){setError('Enter your Player ID first.');return;}setBusy(true);setError('');try{const r=await resolvePlayerLogin({playerId:playerId.trim().toUpperCase()});if(!r.data.email)throw new Error();await sendPasswordResetEmail(auth,r.data.email,{url:'https://immersive-games.com/#/player'});setMessage('If the Player ID is valid, a password reset link will be sent to its registered email.');}catch{setError('We could not send a password reset email.');}finally{setBusy(false);}};
   const upload=async(quest:Quest)=>{
     const selected=files[quest.id]??[];if(!selected.length)return;
+    const permitted=['image/jpeg','image/png','image/webp','video/mp4','video/quicktime','video/webm','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if ((quest.files?.length??0)+selected.length>5) {setError('A maximum of five files can be submitted for this quest.');return;}
+    if (selected.some(file=>!permitted.includes(file.type)||file.size>50*1024*1024)) {setError('Files must be an accepted image, video, PDF or Word document, no larger than 50 MB each.');return;}
     setUploading(quest.id);setError('');setMessage('');
     try{
       const uploaded=[];
