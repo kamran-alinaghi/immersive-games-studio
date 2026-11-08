@@ -16,7 +16,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
     match /players/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || isActiveAdmin() || (resource.data.teamId != null && resource.data.teamId == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.teamId));
+      allow get: if signedIn() && (request.auth.uid == uid || isActiveAdmin());
       allow list: if isActiveAdmin();
       allow create, update, delete: if false;
     }
