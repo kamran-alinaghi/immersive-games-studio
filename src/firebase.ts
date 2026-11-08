@@ -31,7 +31,8 @@ const app = initializeApp(config);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app, 'us-central1');\nexport const storage = getStorage(app);
+export const functions = getFunctions(app, 'us-central1');
+export const storage = getStorage(app);
 
 // The emulator ports are defined in firebase.json.
 // Keep local development isolated from production Firestore and Functions.
