@@ -28,7 +28,7 @@ function escapeHtml(value: string): string {
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
-    '"': "&quot;",
+    "\"": "&quot;",
     "'": "&#39;",
   })[character] ?? character);
 }
@@ -62,9 +62,11 @@ async function getPlayerContact(uid: string) {
 }
 
 /**
- * Claims a delivery record before sending. The deterministic key prevents normal
- * Firestore event retries from sending the same notification more than once.
- * An expired lease can be reclaimed if a function instance stopped unexpectedly.
+ * Claims a delivery record before sending an email.
+ *
+ * @param {string} eventId - Unique Firestore event ID.
+ * @param {string} uid - Firebase UID of the player receiving the notification.
+ * @return {Promise<string | null>} Delivery document ID if claimed; otherwise null.
  */
 async function claimDelivery(eventId: string, uid: string): Promise<string | null> {
   const deliveryId = createHash("sha256")
@@ -134,15 +136,15 @@ async function sendPlayerEmail(
     const greeting = contact.fullName ?
       "Hello " + escapeHtml(contact.fullName) + "," : "Hello,";
     const detailsHtml = notification.details ?
-      '<p style="padding:12px;background:#f4f4f4;border-radius:6px">' +
+      "<p style=\"padding:12px;background:#f4f4f4;border-radius:6px\">" +
         escapeHtml(notification.details) + "</p>" : "";
     const html = [
-      '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#242424;max-width:600px;margin:auto">',
+      "<div style=\"font-family:Arial,sans-serif;line-height:1.6;color:#242424;max-width:600px;margin:auto\">",
       "<p>" + greeting + "</p>",
       "<h2>" + escapeHtml(notification.heading) + "</h2>",
       "<p>" + escapeHtml(notification.message) + "</p>",
       detailsHtml,
-      '<p><a href="' + dashboardUrl + '">Open your player dashboard</a></p>',
+      "<p><a href=\"" + dashboardUrl + "\">Open your player dashboard</a></p>",
       "<p>Immersive Games Studio</p>",
       "</div>",
     ].join("");
