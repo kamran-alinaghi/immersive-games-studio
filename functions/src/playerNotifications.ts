@@ -13,7 +13,7 @@ const db = getFirestore();
 const smtpUser = defineSecret("SMTP_USER");
 const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
 const dashboardUrl = "https://immersive-games.com/#/player";
-const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const deliveryLeaseMs = 5 * 60 * 1000;
 
 type PlayerEmail = {
