@@ -14,7 +14,7 @@ const smtpAppPassword = defineSecret("SMTP_APP_PASSWORD");
 const sender = "Immersive Games Studio <registeration@immersive-games.com>";
 const senderAddress = "registeration@immersive-games.com";
 const deliveryLeaseMs = 5 * 60 * 1000;
-const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const subject = "A Few Things to Know Before We Begin";
 
