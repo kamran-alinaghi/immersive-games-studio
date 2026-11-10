@@ -725,3 +725,8 @@ export {
   notifyOnTeamSuggestionCreated,
   notifyOnTeamSuggestionUpdated,
 } from "./playerNotifications.js";
+
+// Registration welcome email.
+export {
+  sendRegistrationWelcomeEmail,
+} from "./registrationWelcomeEmail.js";
