@@ -32,7 +32,7 @@ Throughout the experience, participants will encounter clues, uncover informatio
 
 HOW DOES IT WORK?
 
-The experience unfolds over several stages. Participants will be organized into teams, with each team consisting of seven players.
+The experience unfolds over several stages. Participants will be organized into teams.
 
 You won't receive the entire story or all the instructions at once. Information will be revealed progressively as the experience develops.
 
