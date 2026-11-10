@@ -97,6 +97,13 @@ const html = `
   </div>
 `;
 
+/**
+ * Claims the registration welcome email delivery record before sending.
+ *
+ * @param {string} registrationId - Firestore registration document ID.
+ * @param {string} eventId - Unique Firestore event ID.
+ * @return {Promise<string | null>} Delivery ID if claimed; otherwise null.
+ */
 async function claimDelivery(registrationId: string, eventId: string): Promise<string | null> {
   const deliveryId = createHash("sha256")
     .update(registrationId + ":" + eventId)
