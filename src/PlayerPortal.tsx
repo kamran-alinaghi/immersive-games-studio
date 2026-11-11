@@ -51,7 +51,15 @@ function PlayerPortal() {
     const selected=files[quest.id]??[];if(!selected.length)return;
     const permitted=['image/jpeg','image/png','image/webp','video/mp4','video/quicktime','video/webm','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if ((quest.files?.length??0)+selected.length>5) {setError('A maximum of five files can be submitted for this quest.');return;}
-    if (selected.some(file=>!permitted.includes(file.type)||file.size>50*1024*1024)) {setError('Files must be an accepted image, video, PDF or Word document, no larger than 50 MB each.');return;}
+    if (selected.some(file =>
+      !permitted.includes(file.type) ||
+      file.size > (file.type.startsWith('video/')
+        ? 250 * 1024 * 1024
+        : 50 * 1024 * 1024)
+    )) {
+      setError('Videos must be no larger than 250 MB. Images and documents must be no larger than 50 MB.');
+      return;
+    }
     setUploading(quest.id);setError('');setMessage('');
     try{
       const uploaded=[];
