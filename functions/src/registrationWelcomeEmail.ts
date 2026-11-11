@@ -16,7 +16,7 @@ const senderAddress = "registeration@immersive-games.com";
 const deliveryLeaseMs = 5 * 60 * 1000;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-const subject = "A Few Things to Know Before We Begin";
+const subject = "Your Registration Is Received — Your Player ID";
 
 const plainText = `Hello,
 
@@ -54,7 +54,11 @@ Some details will remain confidential to preserve the experience for everyone.
 
 WHAT'S NEXT?
 
-Once your registration has been reviewed and approved, you'll receive your Player ID and instructions to activate your account. Your player account is the gateway to the participant portal, where you'll receive relevant information and updates.
+Your Player ID is {{PLAYER_ID}}. Keep it safe; you'll use it together with your password to sign in to your player portal.
+
+Your player portal is your personal space for receiving information and completing upcoming steps. You can access it here: {{PORTAL_URL}}
+
+Your application is currently awaiting review. We'll email you when its status changes.
 
 We look forward to having you with us.
 
@@ -91,7 +95,9 @@ const html = `
     <p>Some details will remain confidential to preserve the experience for everyone.</p>
 
     <h3>What's next?</h3>
-    <p>Once your registration has been reviewed and approved, you'll receive your Player ID and instructions to activate your account. Your player account is the gateway to the participant portal, where you'll receive relevant information and updates.</p>
+    <p>Your Player ID is <strong>{{PLAYER_ID}}</strong>. Keep it safe; you'll use it together with your password to sign in to your player portal.</p>
+    <p>Your player portal is your personal space for receiving information and completing upcoming steps. <a href="{{PORTAL_URL}}">Access your player portal</a>.</p>
+    <p>Your application is currently awaiting review. We'll email you when its status changes.</p>
     <p>We look forward to having you with us.</p>
     <p>Immersive Games Studio<br />Participant Coordination Team<br /><a href="mailto:registeration@immersive-games.com">registeration@immersive-games.com</a></p>
   </div>
@@ -153,6 +159,15 @@ export const sendRegistrationWelcomeEmail = onDocumentCreated(
 
     const email = typeof registration.email === "string" ?
       registration.email.trim().toLowerCase() : "";
+    const playerId = typeof registration.playerId === "string" ?
+      registration.playerId.trim() : "";
+    if (!/^IGS-[A-Z0-9]{6}$/.test(playerId)) {
+      logger.warn("Registration welcome email skipped: Player ID is missing.", {
+        registrationId: event.params.registrationId,
+      });
+      return;
+    }
+    const portalUrl = "https://immersive-games.com/#/player";
     if (!emailPattern.test(email)) {
       logger.warn("Registration welcome email skipped: invalid email address.", {
         registrationId: event.params.registrationId,
@@ -188,8 +203,12 @@ export const sendRegistrationWelcomeEmail = onDocumentCreated(
         to: email,
         replyTo: senderAddress,
         subject,
-        text: plainText,
-        html,
+        text: plainText
+          .replace(/\{\{PLAYER_ID\}\}/g, playerId)
+          .replace(/\{\{PORTAL_URL\}\}/g, portalUrl),
+        html: html
+          .replace(/\{\{PLAYER_ID\}\}/g, playerId)
+          .replace(/\{\{PORTAL_URL\}\}/g, portalUrl),
       });
 
       await deliveryRef.update({

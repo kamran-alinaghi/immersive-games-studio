@@ -7,7 +7,7 @@ import { ArrowLeft, FileText, LogOut, ShieldCheck, Upload, Users } from 'lucide-
 import { auth, db, functions, storage } from './firebase';
 import './admin.css';
 
-type PlayerProfile = { fullName?: string; email?: string; playerId?: string; status?: string; teamId?: string; teamName?: string };
+type PlayerProfile = { fullName?: string; email?: string; playerId?: string; status?: string; applicationStatus?: string; teamId?: string; teamName?: string };
 type Quest = { id: string; questId: string; questTitle?: string; questDescription?: string; status: string; files?: {name:string;path:string;contentType:string;size:number}[]; feedback?:string; };
 type Team = { id:string; name:string; memberUids?:string[]; memberPlayerIds?:string[]; memberNames?:string[]; suggestionsOpen?:boolean };
 type Suggestion = { id:string; teamName?:string; suggestedByPlayerId?:string; status:string };
@@ -16,6 +16,14 @@ const recordSubmission = httpsCallable<{assignmentId:string;files:{name:string;p
 const suggestTeammate = httpsCallable<{teamId:string;playerId:string},{ok:boolean}>(functions,'suggestTeammate');
 const respondSuggestion = httpsCallable<{suggestionId:string;decision:'accept'|'decline'},{ok:boolean}>(functions,'respondToTeamSuggestion');
 const statusLabels:Record<string,string>={not_started:'Not started',submitted:'Submitted',under_review:'Under review',approved:'Approved',revision_required:'Revision required'};
+const applicationStatusLabels:Record<string,string>={new:'Pending review',under_review:'Under review',contacted:'Contacted',approved:'Approved',rejected:'Not selected'};
+const applicationStatusMessages:Record<string,string>={
+  new:'Your application has been received and is waiting for review. You can return to this portal at any time to check for updates.',
+  under_review:'Your application is currently being reviewed. We will contact you when there is an update.',
+  contacted:'Our team has an update or follow-up regarding your application. Please watch your email for further instructions.',
+  approved:'Congratulations! Your application has been approved. Further instructions will be shared by email and in your portal.',
+  rejected:'Thank you for your interest. Your application was not selected to move forward.',
+};
 const allowedExtensions = '.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.pdf,.doc,.docx';
 function PlayerPortal() {
   const [user,setUser]=useState<User|null>(null),[profile,setProfile]=useState<PlayerProfile|null>(null),[authReady,setAuthReady]=useState(false);
@@ -76,6 +84,7 @@ function PlayerPortal() {
   const sendSuggestion=async(e:FormEvent)=>{e.preventDefault();if(!team)return;setBusy(true);setError('');setMessage('');try{await suggestTeammate({teamId:team.id,playerId:suggestedId.trim().toUpperCase()});setSuggestedId('');setMessage('Your suggestion has been sent for administration review.');}catch(e){setError(e instanceof Error?e.message:'Could not submit suggestion.');}finally{setBusy(false);}};
   const respond=async(id:string,decision:'accept'|'decline')=>{setBusy(true);setError('');try{await respondSuggestion({suggestionId:id,decision});setMessage(decision==='accept'?'You have joined the team.':'You declined the team request.');await loadDashboard(user!.uid);}catch(e){setError(e instanceof Error?e.message:'Unable to respond.');}finally{setBusy(false);}};
   const counts=useMemo(()=>({total:quests.length,approved:quests.filter(q=>q.status==='approved').length}),[quests]);
+  const applicationStatus=profile?.applicationStatus??(profile?.status==='approved'?'approved':profile?.status==='rejected'?'rejected':'new');
   if(!authReady)return <main className="admin-page"><p>Checking session…</p></main>;
   if(!user)return <main className="admin-page"><section className="admin-login"><a className="admin-back" href="#top"><ArrowLeft size={15}/> Public website</a><div className="admin-mark"><ShieldCheck size={25}/></div><p className="admin-eyebrow">IMMERSIVE GAMES STUDIO</p><h1>Player portal</h1><p className="admin-muted">Sign in to access your personal player space.</p><form onSubmit={login}><label>Player ID<input required autoComplete="username" placeholder="IGS-XXXXXX" value={playerId} onChange={e=>setPlayerId(e.target.value.toUpperCase())}/></label><label>Password<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<p className="admin-error" role="alert">{error}</p>}{message&&<p className="admin-success" role="status">{message}</p>}<button className="admin-primary" disabled={busy}>{busy?'Please wait…':'Sign in'}</button></form><button className="admin-link" onClick={()=>void reset()} disabled={busy}>Forgot your password?</button></section></main>;
   return <main className="admin-page"><header className="admin-header"><a href="#top" className="admin-brand">IMMERSIVE GAMES <em>STUDIO</em></a><div><span>{user.email}</span><button className="admin-quiet" onClick={()=>void signOut(auth)}><LogOut size={15}/> Sign out</button></div></header>
@@ -83,8 +92,15 @@ function PlayerPortal() {
       {error&&<p className="admin-error" role="alert">{error}</p>}{message&&<p className="admin-success" role="status">{message}</p>}
       {loading&&<p className="admin-muted">Loading your dashboard…</p>}
       {profile&&<div className="admin-player-id"><strong>Your Player ID</strong><p>{profile.playerId??'—'}</p><small>Keep this ID safe.</small></div>}
-      {suggestions.length>0&&<section className="dashboard-panel"><h2>Team requests</h2>{suggestions.map(s=><article className="dashboard-card" key={s.id}><strong>Invitation to join {s.teamName??'a team'}</strong><p>Suggested by {s.suggestedByPlayerId??'a player'} and approved by administration.</p><div className="dashboard-actions"><button className="admin-primary" onClick={()=>void respond(s.id,'accept')} disabled={busy}>Accept</button><button className="admin-secondary" onClick={()=>void respond(s.id,'decline')} disabled={busy}>Decline</button></div></article>)}</section>}
-      <div className="dashboard-grid"><section className="dashboard-panel"><div className="dashboard-section-head"><div><p className="admin-eyebrow">YOUR ASSIGNMENTS</p><h2>Quests</h2></div><span className="dashboard-count">{counts.approved}/{counts.total} approved</span></div>
+      {profile&&<section className="dashboard-panel application-status-panel">
+        <div className="dashboard-section-head">
+          <div><p className="admin-eyebrow">APPLICATION STATUS</p><h2>{applicationStatusLabels[applicationStatus]??'Pending review'}</h2></div>
+          <span className={'admin-badge '+(applicationStatus==='approved'?'approved':applicationStatus==='rejected'?'rejected':'')}>{applicationStatusLabels[applicationStatus]??'Pending review'}</span>
+        </div>
+        <p className="admin-muted">{applicationStatusMessages[applicationStatus]??applicationStatusMessages.new}</p>
+      </section>}
+      {profile?.status==='approved'&&suggestions.length>0&&<section className="dashboard-panel"><h2>Team requests</h2>{suggestions.map(s=><article className="dashboard-card" key={s.id}><strong>Invitation to join {s.teamName??'a team'}</strong><p>Suggested by {s.suggestedByPlayerId??'a player'} and approved by administration.</p><div className="dashboard-actions"><button className="admin-primary" onClick={()=>void respond(s.id,'accept')} disabled={busy}>Accept</button><button className="admin-secondary" onClick={()=>void respond(s.id,'decline')} disabled={busy}>Decline</button></div></article>)}</section>}
+      {profile?.status==='approved'&&<div className="dashboard-grid"><section className="dashboard-panel"><div className="dashboard-section-head"><div><p className="admin-eyebrow">YOUR ASSIGNMENTS</p><h2>Quests</h2></div><span className="dashboard-count">{counts.approved}/{counts.total} approved</span></div>
         {quests.length===0&&<p className="admin-muted">No quests have been assigned to you yet.</p>}
         {quests.map(q=><article className="dashboard-card" key={q.id}><div className="dashboard-card-head"><h3>{q.questTitle??'Quest'}</h3><span className={'admin-badge '+(q.status==='approved'?'approved':q.status==='revision_required'?'rejected':'')}>{statusLabels[q.status]??q.status}</span></div><p className="dashboard-quest-description">{q.questDescription}</p><p className="admin-muted">{q.status==='approved'?'This quest has been approved.':q.status==='under_review'?'Your submission is being reviewed.':q.status==='revision_required'?'Please review the coordinator feedback and submit additional evidence.':q.status==='submitted'?'Your evidence has been submitted and is waiting for review.':'Upload your evidence to complete this quest.'}</p>
           {q.feedback&&<p className="dashboard-feedback"><strong>Coordinator feedback:</strong> {q.feedback}</p>}
@@ -94,7 +110,11 @@ function PlayerPortal() {
       </section><aside className="dashboard-panel"><div className="dashboard-section-head"><div><p className="admin-eyebrow">YOUR GROUP</p><h2><Users size={20}/> My Team</h2></div></div>
         {!team&&<p className="admin-muted">You have not been assigned to a team yet.</p>}
         {team&&<><p className="dashboard-team-name">{team.name}</p><ul className="dashboard-members">{(team.memberPlayerIds??[]).map((id,index)=><li key={id}>{team.memberNames?.[index]??id} · {id} {id===profile?.playerId&&<span>(You)</span>}</li>)}</ul>{team.suggestionsOpen?<form className="dashboard-suggest" onSubmit={sendSuggestion}><label>Suggest a teammate<p className="admin-muted">Enter the Player ID of someone you know and would like to join your team.</p><input placeholder="IGS-XXXXXX" required value={suggestedId} onChange={e=>setSuggestedId(e.target.value.toUpperCase())}/></label><button className="admin-primary" disabled={busy||!suggestedId.trim()}>Submit suggestion</button></form>:<p className="admin-note">Team suggestions are currently closed.</p>}</>}
-      </aside></div>
+      </aside></div>}
+      {profile&&profile.status!=='approved'&&applicationStatus!=='rejected'&&<section className="dashboard-panel">
+        <h2>Your next step</h2>
+        <p className="admin-muted">There is nothing you need to do right now. We will update your application status here and contact you by email when the next step is ready.</p>
+      </section>}
     </section></main>;
 }
 export default PlayerPortal;

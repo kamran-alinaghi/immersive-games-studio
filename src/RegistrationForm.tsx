@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { ArrowLeft, ArrowRight, Check, Compass, LoaderCircle } from 'lucide-react';
+import { auth } from './firebase';
 
 type RegistrationData = {
   ageConfirmed: string;
@@ -78,6 +80,9 @@ function ChoiceGroup({
 function RegistrationForm() {
   const [data, setData] = useState<RegistrationData>(initialData);
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error' | 'unconfigured'>('idle');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [assignedPlayerId, setAssignedPlayerId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const emailHasFormatError = data.email.length > 0 && !emailPattern.test(data.email.trim());
 
@@ -100,15 +105,30 @@ function RegistrationForm() {
     event.preventDefault();
     setErrorMessage('');
 
-    const normalizedEmail = data.email.trim();
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    const normalizedEmail = data.email.trim().toLowerCase();
     if (!emailPattern.test(normalizedEmail)) {
       setStatus('error');
       setErrorMessage('Please enter a valid email address, such as name@example.com.');
       document.getElementById('email')?.focus();
       return;
     }
-
+    if (password.length < 8) {
+      setStatus('error');
+      setErrorMessage('Your password must contain at least 8 characters.');
+      document.getElementById('password')?.focus();
+      return;
+    }
+    if (password !== confirmPassword) {
+      setStatus('error');
+      setErrorMessage('Your passwords do not match.');
+      document.getElementById('confirmPassword')?.focus();
+      return;
+    }
+    if (auth.currentUser && auth.currentUser.email?.toLowerCase() !== normalizedEmail) {
+      setStatus('error');
+      setErrorMessage('Please sign out of the currently signed-in account before registering with a different email address.');
+      return;
+    }
     if (!apiUrl) {
       setStatus('unconfigured');
       return;
@@ -118,44 +138,79 @@ function RegistrationForm() {
       setErrorMessage('Please select at least one answer for Question 9.');
       return;
     }
+    // Discard honeypot submissions before creating any Firebase Auth account.
+    if (data.website.trim() !== '') return;
 
     setStatus('sending');
     try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ageConfirmed: data.ageConfirmed,
-          fullName: data.fullName.trim(),
-          email: data.email.trim(),
-          travelMetroVancouver: data.travelMetroVancouver,
-          area: data.area,
-          commitToSessions: data.commitToSessions,
-          availability: data.availability,
-          motivation: data.motivation.trim(),
-          puzzleApproaches: data.puzzleApproaches,
-          uncertaintyReaction: data.uncertaintyReaction,
-          comfortableRecording: data.comfortableRecording,
-          comfortableExperience: data.comfortableExperience,
-          website: data.website
-        })
-      });
+      const existingSession = auth.currentUser?.email?.toLowerCase() === normalizedEmail ?
+        auth.currentUser : null;
+      const credential = existingSession ?
+        {user: existingSession} :
+        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+      const idToken = await credential.user.getIdToken();
 
-      if (!response.ok) {
-        throw new Error(response.status === 409
-          ? 'This email address has already been used to submit an application.'
-          : response.status === 429
-            ? 'Too many attempts. Please wait a moment and try again.'
-            : 'We could not submit your registration. Please try again.');
+      let response: Response;
+      try {
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            ageConfirmed: data.ageConfirmed,
+            fullName: data.fullName.trim(),
+            email: normalizedEmail,
+            travelMetroVancouver: data.travelMetroVancouver,
+            area: data.area,
+            commitToSessions: data.commitToSessions,
+            availability: data.availability,
+            motivation: data.motivation.trim(),
+            puzzleApproaches: data.puzzleApproaches,
+            uncertaintyReaction: data.uncertaintyReaction,
+            comfortableRecording: data.comfortableRecording,
+            comfortableExperience: data.comfortableExperience,
+            website: data.website
+          })
+        });
+      } catch {
+        throw new Error('We could not confirm your registration. Your account is still signed in; please try submitting again.');
       }
 
+      if (!response.ok) {
+        if (!existingSession) {
+          await deleteUser(credential.user).catch(() => undefined);
+        }
+        throw new Error(response.status === 409
+          ? 'This email address has already been used to submit an application.'
+          : response.status === 401
+            ? 'Your registration session expired. Please try again.'
+            : response.status === 429
+              ? 'Too many attempts. Please wait a moment and try again.'
+              : 'We could not submit your registration. Please try again.');
+      }
+
+      const result = await response.json() as {playerId?: string};
+      if (!result.playerId || !/^IGS-[A-Z0-9]{6}$/.test(result.playerId)) {
+        throw new Error('Your application was submitted, but we could not retrieve your Player ID. Please contact us.');
+      }
+      setAssignedPlayerId(result.playerId);
       setStatus('success');
       setData(initialData);
+      setPassword('');
+      setConfirmPassword('');
     } catch (error) {
       setStatus('error');
-      setErrorMessage(error instanceof Error
-        ? error.message
-        : 'We could not submit your registration. Please try again.');
+      const authCode = typeof error === 'object' && error !== null && 'code' in error ?
+        String((error as {code?: unknown}).code) : '';
+      setErrorMessage(authCode === 'auth/email-already-in-use'
+        ? 'An account with this email already exists. Please use your Player ID to sign in to the portal.'
+        : authCode === 'auth/weak-password'
+          ? 'Please choose a stronger password with at least 8 characters.'
+          : error instanceof Error
+            ? error.message
+            : 'We could not submit your registration. Please try again.');
     }
   };
 
@@ -191,6 +246,16 @@ function RegistrationForm() {
             <label htmlFor="email">Email <span className="required-mark">*</span></label>
             <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Enter an email address in the format name@example.com." aria-invalid={emailHasFormatError} className={emailHasFormatError ? 'registration-email-invalid' : undefined} value={data.email} onChange={event => update('email', event.target.value)} />
             <small className={emailHasFormatError ? 'registration-email-hint-invalid' : undefined}>{emailHasFormatError ? 'Please enter a valid email address, such as name@example.com.' : 'Enter an address in the format name@example.com.'}</small>
+          </div>
+
+          <div className="registration-field">
+            <label htmlFor="password">Create a password <span className="required-mark">*</span></label>
+            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} />
+            <small>Use at least 8 characters. You'll use this password to access your player portal.</small>
+          </div>
+          <div className="registration-field">
+            <label htmlFor="confirmPassword">Confirm password <span className="required-mark">*</span></label>
+            <input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />
           </div>
 
           <ChoiceGroup label="Able to attend games and travel within Metro Vancouver when required?" name="travelMetroVancouver" value={data.travelMetroVancouver} options={['Yes', 'No']} onChange={value => update('travelMetroVancouver', value)} />
@@ -252,7 +317,13 @@ function RegistrationForm() {
 
         {status === 'success' && (
           <div className="registration-status success" role="status">
-            <Check size={18} /> Your application has been received. Thank you for applying. We’ll contact you by email regarding next steps.
+            <Check size={18} />
+            <div>
+              <strong>Your registration has been received!</strong>
+              <p>Your Player ID is <strong>{assignedPlayerId}</strong>. Keep it safe; you'll use it with your password to sign in.</p>
+              <p>We'll also send your Player ID to your email address.</p>
+              <a href="#/player">Access your player portal <ArrowRight size={14} /></a>
+            </div>
           </div>
         )}
         {status === 'unconfigured' && (
@@ -262,7 +333,7 @@ function RegistrationForm() {
         )}
         {status === 'error' && <div className="registration-status error" role="alert">{errorMessage}</div>}
 
-        <button className="button button-dark registration-submit" type="submit" disabled={status === 'sending'}>
+        <button className="button button-dark registration-submit" type="submit" disabled={status === 'sending' || status === 'success'}>
           {status === 'sending' ? <><LoaderCircle className="registration-spinner" size={16} /> Submitting…</> : <>Submit registration <ArrowRight size={16} /></>}
         </button>
         <p className="registration-footnote">Submitting this form is an application, not confirmation of selection or formal recording consent.</p>

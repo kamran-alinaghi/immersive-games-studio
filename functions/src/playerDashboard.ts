@@ -70,7 +70,9 @@ export const assignQuest = onCall(async (request) => {
   if (!idDoc.exists || typeof registrationId !== "string") throw new HttpsError("not-found", "Player not found.");
   const registration = await db.collection("registrations").doc(registrationId).get();
   if (!registration.exists || registration.data()?.status !== "approved") throw new HttpsError("failed-precondition", "Player is not approved.");
-  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
+  const mappedUid = idDoc.data()?.uid;
+  const uid = typeof mappedUid === "string" ? mappedUid :
+    "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
   const player = await db.collection("players").doc(uid).get();
   if (!player.exists || player.data()?.status !== "approved") throw new HttpsError("failed-precondition", "Player account is not active.");
   const existing = await db.collection("questAssignments").where("playerUid", "==", uid).where("questId", "==", questId).limit(1).get();
@@ -167,7 +169,9 @@ export const assignPlayerToTeam = onCall(async (request) => {
   const idDoc = await db.collection("playerIds").doc(playerId).get();
   const registrationId = idDoc.data()?.registrationId;
   if (!idDoc.exists || typeof registrationId !== "string") throw new HttpsError("not-found", "Player not found.");
-  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
+  const mappedUid = idDoc.data()?.uid;
+  const uid = typeof mappedUid === "string" ? mappedUid :
+    "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
   const playerRef = db.collection("players").doc(uid);
   const player = await playerRef.get();
   if (!player.exists || player.data()?.status !== "approved") throw new HttpsError("failed-precondition", "Player is not active.");
@@ -190,7 +194,9 @@ export const suggestTeammate = onCall(async (request) => {
   const targetId = await db.collection("playerIds").doc(targetPlayerId).get();
   const registrationId = targetId.data()?.registrationId;
   if (!targetId.exists || typeof registrationId !== "string") throw new HttpsError("not-found", "The player could not be found.");
-  const uid = "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
+  const mappedUid = targetId.data()?.uid;
+  const uid = typeof mappedUid === "string" ? mappedUid :
+    "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
   if (uid === request.auth!.uid) throw new HttpsError("invalid-argument", "You cannot suggest yourself.");
   const target = await db.collection("players").doc(uid).get();
   if (!target.exists || target.data()?.status !== "approved" || target.data()?.teamId) throw new HttpsError("failed-precondition", "This player is not eligible to join a team.");

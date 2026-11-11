@@ -226,7 +226,7 @@ export const submitRegistration = onRequest(
 
     if (request.method === "OPTIONS") {
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
       response.status(204).send();
       return;
     }
@@ -253,6 +253,28 @@ export const submitRegistration = onRequest(
       return;
     }
 
+    const authorization = request.get("authorization") || "";
+    const tokenMatch = authorization.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) {
+      response.status(401).json({error: "Please sign in to complete registration."});
+      return;
+    }
+
+    let applicantUid = "";
+    try {
+      const decodedToken = await getAuth().verifyIdToken(tokenMatch[1]);
+      applicantUid = decodedToken.uid;
+      const authenticatedEmail = typeof decodedToken.email === "string" ?
+        decodedToken.email.trim().toLowerCase() : "";
+      if (!authenticatedEmail || authenticatedEmail !== validation.value.email) {
+        response.status(403).json({error: "The authenticated account does not match the registration email."});
+        return;
+      }
+    } catch {
+      response.status(401).json({error: "Your registration session has expired. Please try again."});
+      return;
+    }
+
     const ip = request.ip || "unknown";
     try {
       if (await isRateLimited(ip)) {
@@ -267,7 +289,8 @@ export const submitRegistration = onRequest(
         .digest("hex");
       const emailIndexRef = db.collection("_registrationEmails").doc(emailHash);
       const registrationRef = db.collection("registrations").doc();
-      const isDuplicate = await db.runTransaction(async (transaction) => {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      const result = await db.runTransaction(async (transaction) => {
         const [emailIndex, existingRegistration] = await Promise.all([
           transaction.get(emailIndexRef),
           transaction.get(
@@ -278,11 +301,43 @@ export const submitRegistration = onRequest(
         ]);
 
         if (emailIndex.exists || !existingRegistration.empty) {
-          return true;
+          const existingDoc = existingRegistration.docs[0];
+          const existing = existingDoc?.data();
+          if (existingDoc && existing?.authUid === applicantUid &&
+              typeof existing.playerId === "string") {
+            return {
+              duplicate: false,
+              playerId: existing.playerId,
+              status: typeof existing.status === "string" ? existing.status : "new",
+            };
+          }
+          return {duplicate: true, playerId: "", status: "new"};
+        }
+
+        let playerId = "";
+        let playerIdRef = db.collection("playerIds").doc();
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          let suffix = "";
+          for (let index = 0; index < 6; index += 1) {
+            suffix += alphabet[randomInt(alphabet.length)];
+          }
+          const candidate = `IGS-${suffix}`;
+          const candidateRef = db.collection("playerIds").doc(candidate);
+          const existingId = await transaction.get(candidateRef);
+          if (!existingId.exists) {
+            playerId = candidate;
+            playerIdRef = candidateRef;
+            break;
+          }
+        }
+        if (!playerId) {
+          throw new Error("A unique Player ID could not be generated.");
         }
 
         transaction.create(registrationRef, {
           ...validation.value,
+          authUid: applicantUid,
+          playerId,
           createdAt: FieldValue.serverTimestamp(),
           status: "new",
         });
@@ -290,17 +345,36 @@ export const submitRegistration = onRequest(
           registrationId: registrationRef.id,
           createdAt: FieldValue.serverTimestamp(),
         });
-        return false;
+        transaction.create(playerIdRef, {
+          registrationId: registrationRef.id,
+          uid: applicantUid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(db.collection("players").doc(applicantUid), {
+          uid: applicantUid,
+          playerId,
+          email: validation.value.email,
+          fullName: validation.value.fullName,
+          registrationId: registrationRef.id,
+          status: "pending",
+          applicationStatus: "new",
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        return {duplicate: false, playerId, status: "new"};
       });
 
-      if (isDuplicate) {
+      if (result.duplicate) {
         response.status(409).json({
           error: "This email address has already been used to submit an application.",
         });
         return;
       }
 
-      response.status(201).json({ok: true});
+      response.status(201).json({
+        ok: true,
+        playerId: result.playerId,
+        status: result.status,
+      });
     } catch (error) {
       logger.error("Registration submission failed.", error);
       response.status(500).json({
@@ -353,11 +427,22 @@ export const updateRegistrationStatus = onCall(
       if (registration.data()?.status === "approved") {
         throw new HttpsError("failed-precondition", "An approved application cannot be moved back to another status.");
       }
+      const authUid = registration.data()?.authUid;
+      const playerRef = typeof authUid === "string" ?
+        db.collection("players").doc(authUid) : null;
+      const player = playerRef ? await transaction.get(playerRef) : null;
       transaction.update(registrationRef, {
         status,
         reviewedAt: FieldValue.serverTimestamp(),
         reviewedBy: request.auth!.uid,
       });
+      if (playerRef && player?.exists) {
+        transaction.update(playerRef, {
+          applicationStatus: status,
+          status: status === "rejected" ? "rejected" : "pending",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
 
     logger.info("Registration status updated.", {
@@ -372,7 +457,7 @@ export const updateRegistrationStatus = onCall(
 
 /**
  * Resolves a Player ID to its Firebase Authentication email for password-based sign-in.
- * The email is returned only after the ID maps to an approved registration and player record.
+ * The email is returned only after the ID maps to an active application and matching player record.
  */
 export const resolvePlayerLogin = onCall(async (request) => {
   const data = request.data as {playerId?: unknown};
@@ -420,25 +505,27 @@ export const resolvePlayerLogin = onCall(async (request) => {
   const registrationRef = db.collection("registrations").doc(registrationId);
   const registrationSnapshot = await registrationRef.get();
   const registration = registrationSnapshot.data();
+  const validStatuses = ["new", "under_review", "contacted", "approved"];
   if (
     !registrationSnapshot.exists ||
-    registration?.status !== "approved" ||
+    !validStatuses.includes(String(registration?.status)) ||
     registration?.playerId !== playerId
   ) {
     throw new HttpsError("not-found", "Player ID or password is incorrect.");
   }
 
-  const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
+  const uid = typeof registration.authUid === "string" ?
+    registration.authUid :
+    `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
   const playerSnapshot = await db.collection("players").doc(uid).get();
-  // The approved registration is the canonical source for the applicant's email.
-  // Older player documents may not contain the email field, so do not let a
-  // missing denormalized field break login or password-reset requests.
   const registrationEmail = registration?.email;
   const playerEmail = playerSnapshot.data()?.email;
 
   if (
     !playerSnapshot.exists ||
-    playerSnapshot.data()?.status !== "approved" ||
+    !["pending", "approved"].includes(String(playerSnapshot.data()?.status)) ||
+    playerSnapshot.data()?.registrationId !== registrationId ||
+    playerSnapshot.data()?.playerId !== playerId ||
     typeof registrationEmail !== "string" ||
     !emailPattern.test(registrationEmail.trim()) ||
     (typeof playerEmail === "string" &&
@@ -476,7 +563,6 @@ export const approveRegistration = onCall(
     }
 
     const registrationRef = db.collection("registrations").doc(registrationId);
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     const approval = await db.runTransaction(async (transaction) => {
       const registration = await transaction.get(registrationRef);
@@ -489,6 +575,9 @@ export const approveRegistration = onCall(
         current.email.trim().toLowerCase() : "";
       const fullName = typeof current.fullName === "string" ?
         current.fullName.trim() : "";
+      const authUid = typeof current.authUid === "string" ?
+        current.authUid :
+        `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
 
       if (!emailPattern.test(email) || !fullName) {
         throw new HttpsError("failed-precondition", "The application is missing a valid name or email address.");
@@ -500,52 +589,69 @@ export const approveRegistration = onCall(
       if (current.status === "approved" && typeof current.playerId === "string") {
         return {
           playerId: current.playerId,
+          authUid,
           alreadyApproved: true,
           email,
           fullName,
         };
       }
 
-      let playerId = "";
-      let playerIdRef = db.collection("playerIds").doc();
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        let suffix = "";
-        for (let index = 0; index < 6; index += 1) {
-          suffix += alphabet[randomInt(alphabet.length)];
-        }
-        const candidate = `IGS-${suffix}`;
-        const candidateRef = db.collection("playerIds").doc(candidate);
-        const existing = await transaction.get(candidateRef);
-        if (!existing.exists) {
-          playerId = candidate;
-          playerIdRef = candidateRef;
-          break;
+      let playerId = typeof current.playerId === "string" ?
+        current.playerId : "";
+      let playerIdRef = playerId ?
+        db.collection("playerIds").doc(playerId) :
+        db.collection("playerIds").doc();
+      let existingId = playerId ? await transaction.get(playerIdRef) : null;
+
+      if (!playerId) {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          let suffix = "";
+          for (let index = 0; index < 6; index += 1) {
+            suffix += alphabet[randomInt(alphabet.length)];
+          }
+          const candidate = `IGS-${suffix}`;
+          const candidateRef = db.collection("playerIds").doc(candidate);
+          const candidateSnapshot = await transaction.get(candidateRef);
+          if (!candidateSnapshot.exists) {
+            playerId = candidate;
+            playerIdRef = candidateRef;
+            existingId = candidateSnapshot;
+            break;
+          }
         }
       }
 
       if (!playerId) {
         throw new HttpsError("resource-exhausted", "A unique Player ID could not be generated. Please try again.");
       }
+      if (existingId?.exists && existingId.data()?.registrationId !== registrationId) {
+        throw new HttpsError("failed-precondition", "This Player ID is already assigned to another application.");
+      }
 
-      transaction.set(playerIdRef, {
-        registrationId,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      if (!existingId?.exists) {
+        transaction.set(playerIdRef, {
+          registrationId,
+          uid: authUid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
       transaction.update(registrationRef, {
         status: "approved",
         playerId,
+        authUid,
         reviewedAt: FieldValue.serverTimestamp(),
         reviewedBy: request.auth!.uid,
         approvedAt: FieldValue.serverTimestamp(),
         approvedBy: request.auth!.uid,
       });
 
-      return {playerId, alreadyApproved: false, email, fullName};
+      return {playerId, authUid, alreadyApproved: false, email, fullName};
     });
 
     try {
-      // A deterministic UID makes retries safe if a function stops after account creation.
-      const uid = `player_${createHash("sha256").update(registrationId).digest("hex").slice(0, 40)}`;
+      // Reuse the UID created during registration; legacy applications use a deterministic UID.
+      const uid = approval.authUid;
       const playerAuth = getAuth();
       let playerUser;
       try {
@@ -579,6 +685,7 @@ export const approveRegistration = onCall(
         fullName: approval.fullName,
         registrationId,
         status: "approved",
+        applicationStatus: "approved",
         createdAt: playerSnapshot.exists ?
           playerSnapshot.data()?.createdAt ?? FieldValue.serverTimestamp() :
           FieldValue.serverTimestamp(),
@@ -586,10 +693,14 @@ export const approveRegistration = onCall(
       }, {merge: true});
 
       const portalUrl = "https://immersive-games.com/#/player";
-      const passwordSetupLink = await playerAuth.generatePasswordResetLink(
-        approval.email,
-        {url: portalUrl, handleCodeInApp: false},
+      const hasPasswordProvider = playerUser.providerData.some(
+        (provider) => provider.providerId === "password",
       );
+      const passwordSetupLink = hasPasswordProvider ? "" :
+        await playerAuth.generatePasswordResetLink(
+          approval.email,
+          {url: portalUrl, handleCodeInApp: false},
+        );
 
       // The Auth emulator creates a local player account and password setup link,
       // but never sends real email or uses production SMTP credentials.
@@ -626,8 +737,9 @@ export const approveRegistration = onCall(
         <p><strong>${approval.playerId}</strong></p>
         <p>Please keep your Player ID safe. You will use this ID, together with your password, to sign in to your player portal.</p>
         <h3>Access Your Player Portal</h3>
-        <p>You can now set your password and access your personal player portal using the link below:</p>
-        <p><a href="${passwordSetupLink.replace(/&/g, "&amp;")}">Set Your Password &amp; Access Your Portal</a></p>
+        ${passwordSetupLink ?
+    `<p>Set your password and access your personal player portal using the link below:</p><p><a href="${passwordSetupLink.replace(/&/g, "&amp;")}">Set Your Password</a></p>` :
+    `<p>Your password is already set. You can sign in to your personal player portal using the link below:</p><p><a href="${portalUrl}">Access Your Player Portal</a></p>`}
         <p>Your portal will be your personal space for receiving information and completing the upcoming steps.</p>
         <h3>What Happens Next?</h3>
         <p>In the next stage, we'll send you another email with information about the interview process, including what to expect and how to prepare.</p>
@@ -649,8 +761,9 @@ ${approval.playerId}
 Please keep your Player ID safe. You will use this ID, together with your password, to sign in to your player portal.
 
 Access Your Player Portal
-You can now set your password and access your personal player portal using the link below:
-${passwordSetupLink}
+${passwordSetupLink ?
+    `Set your password using this link: ${passwordSetupLink}` :
+    `Your password is already set. Access your portal here: ${portalUrl}`}
 Your portal will be your personal space for receiving information and completing the upcoming steps.
 
 What Happens Next?
