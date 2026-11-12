@@ -827,6 +827,7 @@ export {
   suggestTeammate,
   reviewTeamSuggestion,
   respondToTeamSuggestion,
+  deletePlayerAccount,
 } from "./playerDashboard.js";
 
 // Player dashboard email notifications.
