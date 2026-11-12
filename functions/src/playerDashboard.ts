@@ -53,6 +53,11 @@ export const deletePlayerAccount = onCall(async (request) => {
     typeof idSnapshot?.data()?.uid === "string" ? idSnapshot.data()!.uid :
       "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
 
+  const targetAdmin = await db.collection("admins").doc(uid).get();
+  if (targetAdmin.exists && targetAdmin.data()?.active === true) {
+    throw new HttpsError("failed-precondition", "An active administrator account cannot be deleted through player management.");
+  }
+
   // Disable login first. A missing Auth user is acceptable during a retry.
   try {
     await getAuth().deleteUser(uid);
