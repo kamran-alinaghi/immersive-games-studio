@@ -250,7 +250,7 @@ function AdminDashboardPanel() {
         <div className="quest-details-meta"><span>{selectedQuest.active ? 'Active' : 'Inactive'}</span><span>Quest ID: {selectedQuest.id}</span></div>
         <div className="quest-assignees-heading"><h3><Users size={17} /> Assigned players</h3><span>{assignedPlayers.length}</span></div>
         {loadingPlayers ? <p className="admin-muted">Loading assigned players…</p> : assignedPlayers.length === 0 ? <p className="admin-muted">No players are currently assigned to this quest.</p> : <div className="quest-assignees-list">
-          {assignedPlayers.map(player => <div className="quest-assignee" key={player.id}><div><strong>{player.playerName}</strong><small>{player.playerId || 'Player ID unavailable'}</small></div><span className={'admin-badge ' + (player.status === 'approved' ? 'approved' : '')}>{player.status.replaceAll('_', ' ')}</span></div>)}
+          {assignedPlayers.map(player => <div className="quest-assignee" key={player.id}><div><strong>{player.playerName}</strong><small>{player.playerId || 'Player ID unavailable'}</small></div><span className={'admin-badge ' + (player.status === 'approved' ? 'approved' : '')}>{player.status.replace(/_/g, ' ')}</span></div>)}
         </div>}
         <div className="dashboard-actions"><button className="admin-secondary" onClick={() => setSelectedQuest(null)}>Close</button><button className="admin-primary" onClick={() => { setSelectedQuest(null); openQuestEditor(selectedQuest); }}>Edit quest</button></div>
       </section>
