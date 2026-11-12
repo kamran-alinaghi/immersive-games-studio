@@ -62,8 +62,8 @@ export const deletePlayerAccount = onCall(async (request) => {
 
   // Remove the player from shared teams without deleting team history or other members.
   const teams = await db.collection("teams").get();
-  const teamBatch = db.batch();
-  let changedTeams = 0;
+  let teamBatch = db.batch();
+  let teamWrites = 0;
   for (const teamDoc of teams.docs) {
     const team = teamDoc.data();
     const memberUids = Array.isArray(team.memberUids) ? team.memberUids : [];
@@ -83,21 +83,28 @@ export const deletePlayerAccount = onCall(async (request) => {
         memberNames: memberNames.filter((_: unknown, index: number) => !indexesToRemove.has(index)),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      changedTeams += 1;
+      teamWrites += 1;
+      if (teamWrites >= 450) {
+        await teamBatch.commit();
+        teamBatch = db.batch();
+        teamWrites = 0;
+      }
     }
   }
-  if (changedTeams) await teamBatch.commit();
+  if (teamWrites) await teamBatch.commit();
 
   // Delete pending, accepted, and historical suggestions involving this player.
   const [outgoingSuggestions, incomingSuggestions] = await Promise.all([
     db.collection("teamSuggestions").where("suggestedByUid", "==", uid).get(),
     db.collection("teamSuggestions").where("suggestedPlayerUid", "==", uid).get(),
   ]);
-  const suggestionRefs = new Map<string, FirebaseFirestore.DocumentReference>();
-  [...outgoingSuggestions.docs, ...incomingSuggestions.docs].forEach((doc) => {
-    suggestionRefs.set(doc.id, doc.ref);
-  });
-  const suggestionDocs = [...suggestionRefs.values()];
+  const seenSuggestionIds = new Set<string>();
+  const suggestionDocs = [...outgoingSuggestions.docs, ...incomingSuggestions.docs]
+    .filter((doc) => {
+      if (seenSuggestionIds.has(doc.id)) return false;
+      seenSuggestionIds.add(doc.id);
+      return true;
+    });
   for (let offset = 0; offset < suggestionDocs.length; offset += 400) {
     const batch = db.batch();
     suggestionDocs.slice(offset, offset + 400).forEach((ref) => batch.delete(ref));
