@@ -1,6 +1,7 @@
 /* eslint-disable max-len, require-jsdoc, @typescript-eslint/no-explicit-any */
 import {createHash} from "node:crypto";
 import {getApps, initializeApp} from "firebase-admin/app";
+import {getAuth} from "firebase-admin/auth";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {getStorage} from "firebase-admin/storage";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
@@ -25,6 +26,128 @@ async function requirePlayer(uid?: string) {
 }
 const clean = (v: unknown, max = 500) =>
   typeof v === "string" ? v.trim().slice(0, max) : "";
+
+/**
+ * Permanently deletes a player account and all player-owned data.
+ * Shared team documents are retained with only this player's membership removed.
+ */
+export const deletePlayerAccount = onCall(async (request) => {
+  await requireAdmin(request.auth?.uid);
+  const registrationId = clean(request.data?.registrationId, 150);
+  if (!registrationId) {
+    throw new HttpsError("invalid-argument", "A valid registration is required.");
+  }
+
+  const registrationRef = db.collection("registrations").doc(registrationId);
+  const registrationSnapshot = await registrationRef.get();
+  if (!registrationSnapshot.exists) {
+    throw new HttpsError("not-found", "The player application could not be found.");
+  }
+
+  const registration = registrationSnapshot.data()!;
+  const playerId = clean(registration.playerId, 20).toUpperCase();
+  const email = clean(registration.email, 254).toLowerCase();
+  const idRef = playerId ? db.collection("playerIds").doc(playerId) : null;
+  const idSnapshot = idRef ? await idRef.get() : null;
+  const uid = typeof registration.authUid === "string" ? registration.authUid :
+    typeof idSnapshot?.data()?.uid === "string" ? idSnapshot.data()!.uid :
+      "player_" + createHash("sha256").update(registrationId).digest("hex").slice(0, 40);
+
+  // Disable login first. A missing Auth user is acceptable during a retry.
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (error) {
+    if ((error as {code?: string}).code !== "auth/user-not-found") throw error;
+  }
+
+  // Remove the player from shared teams without deleting team history or other members.
+  const teams = await db.collection("teams").get();
+  const teamBatch = db.batch();
+  let changedTeams = 0;
+  for (const teamDoc of teams.docs) {
+    const team = teamDoc.data();
+    const memberUids = Array.isArray(team.memberUids) ? team.memberUids : [];
+    const memberPlayerIds = Array.isArray(team.memberPlayerIds) ? team.memberPlayerIds : [];
+    const memberNames = Array.isArray(team.memberNames) ? team.memberNames : [];
+    const indexesToRemove = new Set<number>();
+    memberUids.forEach((memberUid: unknown, index: number) => {
+      if (memberUid === uid) indexesToRemove.add(index);
+    });
+    memberPlayerIds.forEach((memberId: unknown, index: number) => {
+      if (playerId && memberId === playerId) indexesToRemove.add(index);
+    });
+    if (indexesToRemove.size) {
+      teamBatch.update(teamDoc.ref, {
+        memberUids: memberUids.filter((_: unknown, index: number) => !indexesToRemove.has(index)),
+        memberPlayerIds: memberPlayerIds.filter((_: unknown, index: number) => !indexesToRemove.has(index)),
+        memberNames: memberNames.filter((_: unknown, index: number) => !indexesToRemove.has(index)),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      changedTeams += 1;
+    }
+  }
+  if (changedTeams) await teamBatch.commit();
+
+  // Delete pending, accepted, and historical suggestions involving this player.
+  const [outgoingSuggestions, incomingSuggestions] = await Promise.all([
+    db.collection("teamSuggestions").where("suggestedByUid", "==", uid).get(),
+    db.collection("teamSuggestions").where("suggestedPlayerUid", "==", uid).get(),
+  ]);
+  const suggestionRefs = new Map<string, FirebaseFirestore.DocumentReference>();
+  [...outgoingSuggestions.docs, ...incomingSuggestions.docs].forEach((doc) => {
+    suggestionRefs.set(doc.id, doc.ref);
+  });
+  const suggestionDocs = [...suggestionRefs.values()];
+  for (let offset = 0; offset < suggestionDocs.length; offset += 400) {
+    const batch = db.batch();
+    suggestionDocs.slice(offset, offset + 400).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+
+  // Remove every quest assignment and the evidence files owned by this UID.
+  const assignments = await db.collection("questAssignments")
+    .where("playerUid", "==", uid).get();
+  const bucket = getStorage().bucket();
+  const prefixes = [
+    `quest-submissions/${uid}/`,
+    `players/${uid}/`,
+    `player-uploads/${uid}/`,
+  ];
+  for (const prefix of prefixes) {
+    const [files] = await bucket.getFiles({prefix});
+    for (let offset = 0; offset < files.length; offset += 100) {
+      await Promise.all(files.slice(offset, offset + 100).map((file) => file.delete({ignoreNotFound: true})));
+    }
+  }
+  for (let offset = 0; offset < assignments.docs.length; offset += 400) {
+    const batch = db.batch();
+    assignments.docs.slice(offset, offset + 400).forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  // Remove notification delivery metadata associated with this player.
+  const deliveries = await db.collection("_playerEmailDeliveries")
+    .where("playerUid", "==", uid).get();
+  for (let offset = 0; offset < deliveries.docs.length; offset += 400) {
+    const batch = db.batch();
+    deliveries.docs.slice(offset, offset + 400).forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  // Remove the player profile and any nested player-owned documents.
+  const playerRef = db.collection("players").doc(uid);
+  await db.recursiveDelete(playerRef);
+
+  // Release the email and Player ID only after the rest of the cleanup has succeeded.
+  if (email) {
+    const emailHash = createHash("sha256").update(email).digest("hex");
+    await db.collection("_registrationEmails").doc(emailHash).delete();
+  }
+  if (idRef) await idRef.delete();
+  await registrationRef.delete();
+
+  return {ok: true, playerId, deletedUid: uid};
+});
 
 export const createQuest = onCall(async (request) => {
   await requireAdmin(request.auth?.uid);
