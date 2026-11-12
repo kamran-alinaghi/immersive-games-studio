@@ -167,6 +167,7 @@ function AdminApp() {
           ? `You are about to permanently delete ${selected.fullName || selected.email || 'this player'}'s account and associated data, including their login, Player ID, team membership, quest submissions, and uploaded files.`
           : `You are about to permanently erase ${selected.fullName || selected.email || 'this player'}'s account. This cannot be undone. Their email and Player ID will become available for a new registration.`}</p>
         <div className="delete-confirm-warning">This action is permanent. Please make sure you have selected the correct player.</div>
+        {error && <p className="delete-confirm-error" role="alert">{error}</p>}
         <div className="delete-confirm-actions">
           <button type="button" className="delete-confirm-cancel" onClick={() => setDeleteConfirmationStep(0)} disabled={!!deletingId}>Cancel</button>
           {deleteConfirmationStep === 1
