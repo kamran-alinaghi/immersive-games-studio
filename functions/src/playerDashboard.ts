@@ -193,6 +193,39 @@ export const updateQuest = onCall(async (request) => {
   return {ok: true};
 });
 
+
+/**
+ * Returns the players assigned to a quest for the admin quest details view.
+ */
+export const getQuestAssignmentsForAdmin = onCall(async (request) => {
+  await requireAdmin(request.auth?.uid);
+  const questId = clean(request.data?.questId, 150);
+  if (!questId) throw new HttpsError("invalid-argument", "Quest ID is required.");
+
+  const snapshot = await db.collection("questAssignments")
+    .where("questId", "==", questId).get();
+
+  const players = await Promise.all(snapshot.docs.map(async (assignment) => {
+    const data = assignment.data();
+    const playerUid = clean(data.playerUid, 150);
+    const playerSnapshot = playerUid
+      ? await db.collection("players").doc(playerUid).get()
+      : null;
+    const player = playerSnapshot?.data();
+    const playerId = clean(data.playerId, 20).toUpperCase();
+    return {
+      id: assignment.id,
+      playerId,
+      playerName: clean(player?.fullName, 160) ||
+        clean(data.playerName, 160) || playerId || "Unknown player",
+      status: clean(data.status, 40) || "not_started",
+    };
+  }));
+
+  players.sort((a, b) => a.playerName.localeCompare(b.playerName));
+  return {ok: true, players};
+});
+
 export const assignQuest = onCall(async (request) => {
   await requireAdmin(request.auth?.uid);
   const questId = clean(request.data?.questId, 150);
