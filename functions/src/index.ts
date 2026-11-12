@@ -818,6 +818,7 @@ Immersive Games Studio`;
 export {
   createQuest,
   updateQuest,
+  getQuestAssignmentsForAdmin,
   assignQuest,
   recordQuestSubmission,
   reviewQuestSubmission,
