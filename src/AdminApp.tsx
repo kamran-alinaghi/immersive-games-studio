@@ -32,6 +32,7 @@ function AdminApp() {
   const [savingId, setSavingId] = useState('');
   const [approvingId, setApprovingId] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState<0 | 1 | 2>(0);
   const [approvalMessage, setApprovalMessage] = useState('');
 
   useEffect(() => onAuthStateChanged(auth, current => { setUser(current); setAuthReady(true); }), []);
@@ -69,12 +70,7 @@ function AdminApp() {
   };
 
   const deleteSelectedApplicant = async () => {
-    if (!selected || deletingId) return;
-    const applicantName = selected.fullName || selected.email || 'this applicant';
-    const confirmed = window.confirm(
-      `Permanently delete ${applicantName}'s account and all associated data? This includes their login, registration, Player ID, team membership, quest submissions, and uploaded files. They will be able to register again. This cannot be undone.`,
-    );
-    if (!confirmed) return;
+    if (!selected || deletingId || deleteConfirmationStep !== 2) return;
 
     setDeletingId(selected.id);
     setError('');
@@ -83,6 +79,7 @@ function AdminApp() {
       await deletePlayerAccount({ registrationId: selected.id });
       setApplicants(current => current.filter(item => item.id !== selected.id));
       setSelected(null);
+      setDeleteConfirmationStep(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Account deletion failed. You can safely retry this operation.');
     } finally {
@@ -158,9 +155,26 @@ function AdminApp() {
       {approvalMessage && <p className="admin-success" role="status">{approvalMessage}</p>}
       {selected.status === 'approved' && <div className="admin-player-id"><strong>Player ID</strong><p>{selected.playerId || 'No Player ID recorded'}</p></div>}
       {error && <p className="admin-error" role="alert">{error}</p>}
-      <button className="admin-danger" type="button" onClick={() => void deleteSelectedApplicant()} disabled={deletingId === selected.id || approvingId === selected.id || savingId === selected.id}><Trash2 size={15}/>{deletingId === selected.id ? 'Deleting account…' : 'Delete player account'}</button>
+      <button className="admin-danger" type="button" onClick={() => setDeleteConfirmationStep(1)} disabled={deletingId === selected.id || approvingId === selected.id || savingId === selected.id}><Trash2 size={15}/>Delete player account</button>
       {selected.status === 'approved' ? <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id}>{approvingId === selected.id ? 'Sending…' : 'Retry Approval Email'}</button> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
     </section></div>}
+    {deleteConfirmationStep > 0 && selected && <div className="delete-confirm-overlay" role="presentation">
+      <section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description">
+        <div className="delete-confirm-icon"><Trash2 size={25}/></div>
+        <p className="delete-confirm-eyebrow">PERMANENT ACCOUNT DELETION · STEP {deleteConfirmationStep} OF 2</p>
+        <h2 id="delete-confirm-title">{deleteConfirmationStep === 1 ? 'Are you sure?' : 'This is your final confirmation.'}</h2>
+        <p id="delete-confirm-description">{deleteConfirmationStep === 1
+          ? `You are about to permanently delete ${selected.fullName || selected.email || 'this player'}'s account and associated data, including their login, Player ID, team membership, quest submissions, and uploaded files.`
+          : `You are about to permanently erase ${selected.fullName || selected.email || 'this player'}'s account. This cannot be undone. Their email and Player ID will become available for a new registration.`}</p>
+        <div className="delete-confirm-warning">This action is permanent. Please make sure you have selected the correct player.</div>
+        <div className="delete-confirm-actions">
+          <button type="button" className="delete-confirm-cancel" onClick={() => setDeleteConfirmationStep(0)} disabled={!!deletingId}>Cancel</button>
+          {deleteConfirmationStep === 1
+            ? <button type="button" className="delete-confirm-continue" onClick={() => setDeleteConfirmationStep(2)}>Continue to final confirmation</button>
+            : <button type="button" className="delete-confirm-final" onClick={() => void deleteSelectedApplicant()} disabled={!!deletingId}>{deletingId ? 'Deleting account…' : 'Yes, permanently delete'}</button>}
+        </div>
+      </section>
+    </div>}
   </main>;
 }
 export default AdminApp;
