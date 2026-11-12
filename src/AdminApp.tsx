@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { collection, getDocs, orderBy, query, type DocumentData } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, LogOut, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, LogOut, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { auth, db, functions } from './firebase';
 import './admin.css';
 import AdminDashboardPanel from './AdminDashboardPanel';
@@ -14,6 +14,7 @@ const statuses: Status[] = ['new', 'under_review', 'approved', 'rejected', 'cont
 const labels: Record<Status, string> = { new: 'New', under_review: 'Under Review', approved: 'Approved', rejected: 'Rejected', contacted: 'Contacted' };
 const updateApplicantStatus = httpsCallable<{ registrationId: string; status: Exclude<Status, 'approved'> }, { ok: boolean }>(functions, 'updateRegistrationStatus');
 const approveApplicant = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string; alreadyApproved: boolean; emailSent: boolean; emailSkipped?: boolean }>(functions, 'approveRegistration');
+const deletePlayerAccount = httpsCallable<{ registrationId: string }, { ok: boolean; playerId: string }>(functions, 'deletePlayerAccount');
 
 function AdminApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +31,7 @@ function AdminApp() {
   const [error, setError] = useState('');
   const [savingId, setSavingId] = useState('');
   const [approvingId, setApprovingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
   const [approvalMessage, setApprovalMessage] = useState('');
 
   useEffect(() => onAuthStateChanged(auth, current => { setUser(current); setAuthReady(true); }), []);
@@ -64,6 +66,28 @@ function AdminApp() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Status update failed. Verify administrator permissions.');
     } finally { setSavingId(''); }
+  };
+
+  const deleteSelectedApplicant = async () => {
+    if (!selected || deletingId) return;
+    const applicantName = selected.fullName || selected.email || 'this applicant';
+    const confirmed = window.confirm(
+      `Permanently delete ${applicantName}'s account and all associated data? This includes their login, registration, Player ID, team membership, quest submissions, and uploaded files. They will be able to register again. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(selected.id);
+    setError('');
+    setApprovalMessage('');
+    try {
+      await deletePlayerAccount({ registrationId: selected.id });
+      setApplicants(current => current.filter(item => item.id !== selected.id));
+      setSelected(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Account deletion failed. You can safely retry this operation.');
+    } finally {
+      setDeletingId('');
+    }
   };
 
   const approveSelectedApplicant = async () => {
@@ -133,6 +157,7 @@ function AdminApp() {
       <div className="admin-answers">{Object.entries(selected).filter(([key]) => key !== 'id' && key !== 'createdAt' && key !== 'status' && key !== 'reviewedAt' && key !== 'reviewedBy').map(([key, value]) => <div key={key}><strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</strong><p>{Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}</p></div>)}<div><strong>Submitted</strong><p>{formatDate(selected.createdAt)}</p></div></div>
       {approvalMessage && <p className="admin-success" role="status">{approvalMessage}</p>}
       {selected.status === 'approved' && <div className="admin-player-id"><strong>Player ID</strong><p>{selected.playerId || 'No Player ID recorded'}</p></div>}
+      <button className="admin-danger" type="button" onClick={() => void deleteSelectedApplicant()} disabled={deletingId === selected.id || approvingId === selected.id || savingId === selected.id}><Trash2 size={15}/>{deletingId === selected.id ? 'Deleting account…' : 'Delete player account'}</button>
       {selected.status === 'approved' ? <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id}>{approvingId === selected.id ? 'Sending…' : 'Retry Approval Email'}</button> : <button className="admin-primary" type="button" onClick={() => void approveSelectedApplicant()} disabled={approvingId === selected.id || savingId === selected.id || selected.status === 'rejected'}>{approvingId === selected.id ? 'Approving…' : 'Approve Applicant'}</button>}
     </section></div>}
   </main>;
