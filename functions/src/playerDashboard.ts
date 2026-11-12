@@ -112,7 +112,7 @@ export const deletePlayerAccount = onCall(async (request) => {
     });
   for (let offset = 0; offset < suggestionDocs.length; offset += 400) {
     const batch = db.batch();
-    suggestionDocs.slice(offset, offset + 400).forEach((ref) => batch.delete(ref));
+    suggestionDocs.slice(offset, offset + 400).forEach((doc) => batch.delete(doc.ref));
     await batch.commit();
   }
 
