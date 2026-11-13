@@ -224,6 +224,36 @@ export const getQuestAssignmentsForAdmin = onCall(async (request) => {
   return {ok: true, players};
 });
 
+/**
+ * Returns a player's assignments joined with the latest master quest content.
+ * Assignment progress and evidence remain stored on the assignment documents.
+ */
+export const getPlayerQuests = onCall(async (request) => {
+  await requirePlayer(request.auth?.uid);
+  const playerUid = request.auth!.uid;
+  const assignments = await db.collection("questAssignments")
+    .where("playerUid", "==", playerUid).get();
+
+  const quests = await Promise.all(assignments.docs.map(async (assignment) => {
+    const data = assignment.data();
+    const questId = typeof data.questId === "string" ? data.questId : "";
+    const questSnapshot = questId ?
+      await db.collection("quests").doc(questId).get() : null;
+    const currentQuest = questSnapshot?.exists ? questSnapshot.data() : null;
+
+    return {
+      ...data,
+      id: assignment.id,
+      questTitle: typeof currentQuest?.title === "string" ?
+        currentQuest.title : data.questTitle,
+      questDescription: typeof currentQuest?.description === "string" ?
+        currentQuest.description : data.questDescription,
+    };
+  }));
+
+  return {quests};
+});
+
 export const assignQuest = onCall(async (request) => {
   await requireAdmin(request.auth?.uid);
   const questId = clean(request.data?.questId, 150);
