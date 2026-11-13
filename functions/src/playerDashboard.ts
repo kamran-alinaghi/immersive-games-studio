@@ -208,9 +208,7 @@ export const getQuestAssignmentsForAdmin = onCall(async (request) => {
   const players = await Promise.all(snapshot.docs.map(async (assignment) => {
     const data = assignment.data();
     const playerUid = clean(data.playerUid, 150);
-    const playerSnapshot = playerUid
-      ? await db.collection("players").doc(playerUid).get()
-      : null;
+    const playerSnapshot = playerUid? await db.collection("players").doc(playerUid).get(): null;
     const player = playerSnapshot?.data();
     const playerId = clean(data.playerId, 20).toUpperCase();
     return {
