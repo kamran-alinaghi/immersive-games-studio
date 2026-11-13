@@ -819,6 +819,7 @@ export {
   createQuest,
   updateQuest,
   getQuestAssignmentsForAdmin,
+  getPlayerQuests,
   assignQuest,
   recordQuestSubmission,
   reviewQuestSubmission,
