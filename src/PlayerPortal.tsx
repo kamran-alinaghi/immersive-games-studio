@@ -12,6 +12,7 @@ type Quest = { id: string; questId: string; questTitle?: string; questDescriptio
 type Team = { id:string; name:string; memberUids?:string[]; memberPlayerIds?:string[]; memberNames?:string[]; suggestionsOpen?:boolean };
 type Suggestion = { id:string; teamName?:string; suggestedByPlayerId?:string; status:string };
 const resolvePlayerLogin = httpsCallable<{playerId:string},{email:string}>(functions,'resolvePlayerLogin');
+const getPlayerQuests = httpsCallable<void,{quests:Quest[]}>(functions,'getPlayerQuests');
 const recordSubmission = httpsCallable<{assignmentId:string;files:{name:string;path:string;contentType:string;size:number}[]}, {ok:boolean}>(functions,'recordQuestSubmission');
 const suggestTeammate = httpsCallable<{teamId:string;playerId:string},{ok:boolean}>(functions,'suggestTeammate');
 const respondSuggestion = httpsCallable<{suggestionId:string;decision:'accept'|'decline'},{ok:boolean}>(functions,'respondToTeamSuggestion');
@@ -37,11 +38,11 @@ function PlayerPortal() {
     try{
       const p=await getDoc(doc(db,'players',uid)); if(!p.exists()) throw new Error('Player profile not found.');
       const data=p.data() as PlayerProfile;setProfile(data);
-      const [assignments,pending]=await Promise.all([
-        getDocs(query(collection(db,'questAssignments'),where('playerUid','==',uid))),
+      const [playerQuests,pending]=await Promise.all([
+        getPlayerQuests(),
         getDocs(query(collection(db,'teamSuggestions'),where('suggestedPlayerUid','==',uid),where('status','==','awaiting_player')))
       ]);
-      setQuests(assignments.docs.map(d=>({id:d.id,...d.data()} as Quest)));
+      setQuests(playerQuests.data.quests);
       setSuggestions(pending.docs.map(d=>({id:d.id,...d.data()} as Suggestion)));
       if(data.teamId){
         const t=await getDoc(doc(db,'teams',data.teamId));
